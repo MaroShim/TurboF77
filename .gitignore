@@ -1,0 +1,13 @@
+# Binaries
+bin/
+*.exe
+*.o
+*.obj
+*.err
+*.out
+
+# macOS
+.DS_Store
+
+# Go test binaries
+*.test
