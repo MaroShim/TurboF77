@@ -68,8 +68,10 @@ func NewMenuBar() *MenuBar {
 				HotIndex: 0,
 				Items: []MenuItem{
 					{Label: "Find...", Shortcut: "Ctrl+F", ActionID: "search_find"},
+					{Label: "Find in project...", Shortcut: "Alt+F3", ActionID: "search_project"},
 					{Label: "Search again", Shortcut: "Ctrl+L", ActionID: "search_again"},
 					{Label: "Go to line...", Shortcut: "Alt+G", ActionID: "search_goto"},
+					{Label: "Go to definition", Shortcut: "F12", ActionID: "search_definition"},
 				},
 			},
 			{

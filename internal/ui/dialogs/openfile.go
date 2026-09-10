@@ -49,6 +49,10 @@ func (o *OpenFileDialog) Hide() {
 	o.Visible = false
 }
 
+func (o *OpenFileDialog) IsVisible() bool {
+	return o.Visible
+}
+
 func (o *OpenFileDialog) RefreshFiles() {
 	entries, err := os.ReadDir(o.CurrentPath)
 	o.Files = nil
@@ -112,6 +116,7 @@ func (o *OpenFileDialog) Draw(screen tcell.Screen, screenW, screenH int) {
 	if !o.Visible {
 		return
 	}
+	screen.HideCursor()
 
 	dialogW := 52
 	dialogH := 16
