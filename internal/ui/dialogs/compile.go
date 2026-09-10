@@ -75,7 +75,12 @@ func (cd *CompileDialog) Draw(screen tcell.Screen, screenW, screenH int) {
 		compilerName = cd.Result.CompilerName
 	}
 
-	drawRow(0, "Main file:", cd.FileName, textStyle)
+	mainFileDisplay := cd.FileName
+	if cd.Result != nil && len(cd.Result.SourceFiles) > 1 {
+		mainFileDisplay = fmt.Sprintf("%s (+%d)", cd.FileName, len(cd.Result.SourceFiles)-1)
+	}
+
+	drawRow(0, "Main file:", mainFileDisplay, textStyle)
 	drawRow(1, "Compiler:", compilerName, textStyle)
 	drawRow(2, "Total lines:", fmt.Sprintf("%d", cd.Lines), textStyle)
 

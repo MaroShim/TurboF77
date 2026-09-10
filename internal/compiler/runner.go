@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
 
 // CompileError holds parsed compiler diagnostic information
@@ -34,6 +35,7 @@ type BuildResult struct {
 	WarningCount  int
 	BinaryPath    string
 	RawOutput     string
+	SourceFiles   []string // List of source files compiled
 }
 
 // RunResult holds outcome of program execution
@@ -133,7 +135,139 @@ func FindFortranCompiler() (CompilerInfo, bool) {
 // IsFortranSource checks if a filename is a Fortran 77 source file
 func IsFortranSource(path string) bool {
 	ext := strings.ToLower(filepath.Ext(path))
-	return ext == ".for" || ext == ".f" || ext == ".f77" || ext == ".for77" || ext == ".inc"
+	return ext == ".for" || ext == ".f" || ext == ".f77" || ext == ".for77" || ext == ".ftn" || ext == ".inc"
+}
+
+// HasProgramStatement checks if a Fortran source file contains a PROGRAM statement
+func HasProgramStatement(path string) bool {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	lines := strings.Split(string(content), "\n")
+	for _, rawLine := range lines {
+		line := strings.TrimRight(rawLine, "\r")
+		if len(line) == 0 {
+			continue
+		}
+		// In F77, comment in column 1 (0-indexed)
+		first := line[0]
+		if first == 'C' || first == 'c' || first == '*' || first == '!' {
+			continue
+		}
+		// Strip inline comment
+		if idx := strings.Index(line, "!"); idx >= 0 {
+			line = line[:idx]
+		}
+		trimmed := strings.TrimSpace(line)
+		// Strip optional statement label
+		for len(trimmed) > 0 && unicode.IsDigit(rune(trimmed[0])) {
+			trimmed = strings.TrimSpace(trimmed[1:])
+		}
+		upper := strings.ToUpper(trimmed)
+		if strings.HasPrefix(upper, "PROGRAM") {
+			rest := upper[len("PROGRAM"):]
+			if len(rest) == 0 || rest[0] == ' ' || rest[0] == '\t' {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// FindCompanionFiles scans the directory of targetPath for other Fortran source files
+// that do NOT contain a PROGRAM statement (i.e. subroutines, functions, block data).
+func FindCompanionFiles(targetPath string) []string {
+	absTarget, err := filepath.Abs(targetPath)
+	if err != nil {
+		absTarget = targetPath
+	}
+	baseTarget := filepath.Base(absTarget)
+
+	// Avoid scanning companions if the file is an unsaved temporary buffer in temp directory
+	if strings.HasPrefix(baseTarget, "tf77_temp_") {
+		return nil
+	}
+
+	dir := filepath.Dir(absTarget)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+
+	var companions []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if name == baseTarget {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(name))
+		// Only compile source files, exclude .inc headers
+		if ext != ".for" && ext != ".f" && ext != ".f77" && ext != ".for77" && ext != ".ftn" {
+			continue
+		}
+		fullPath := filepath.Join(dir, name)
+		if !HasProgramStatement(fullPath) {
+			companions = append(companions, fullPath)
+		}
+	}
+	return companions
+}
+
+// FindMainProgramFile finds a file in dir that defines a PROGRAM statement, excluding excludePath
+func FindMainProgramFile(dir string, excludePath string) string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return ""
+	}
+	excludeBase := filepath.Base(excludePath)
+	var mainFiles []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if name == excludeBase {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(name))
+		if ext != ".for" && ext != ".f" && ext != ".f77" && ext != ".for77" && ext != ".ftn" {
+			continue
+		}
+		fullPath := filepath.Join(dir, name)
+		if HasProgramStatement(fullPath) {
+			mainFiles = append(mainFiles, fullPath)
+		}
+	}
+	if len(mainFiles) == 1 {
+		return mainFiles[0]
+	}
+	return ""
+}
+
+// CountFileLines counts non-empty lines in a single file
+func CountFileLines(path string) int {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return 0
+	}
+	trimmed := bytes.TrimRight(content, "\r\n")
+	if len(trimmed) == 0 {
+		return 0
+	}
+	return bytes.Count(trimmed, []byte("\n")) + 1
+}
+
+// CountTotalLines counts total lines of code across all given files
+func CountTotalLines(files []string) int {
+	total := 0
+	for _, f := range files {
+		total += CountFileLines(f)
+	}
+	return total
 }
 
 // CountLines counts total lines of Fortran code in the specified target or directory
@@ -147,21 +281,14 @@ func CountLines(targetPath string) int {
 	if info.IsDir() {
 		_ = filepath.Walk(targetPath, func(path string, fi os.FileInfo, err error) error {
 			if err == nil && !fi.IsDir() && IsFortranSource(path) {
-				content, err := os.ReadFile(path)
-				if err == nil {
-					total += bytes.Count(content, []byte("\n")) + 1
-				}
+				total += CountFileLines(path)
 			}
 			return nil
 		})
 		return total
 	}
 
-	content, err := os.ReadFile(targetPath)
-	if err == nil {
-		return bytes.Count(content, []byte("\n")) + 1
-	}
-	return 0
+	return CountFileLines(targetPath)
 }
 
 // ParseErrors extracts CompileError list from compiler diagnostic text
@@ -262,9 +389,6 @@ func Build(targetPath string) *BuildResult {
 	start := time.Now()
 	res := &BuildResult{}
 
-	lines := CountLines(targetPath)
-	res.LinesCompiled = lines
-
 	absTarget, err := filepath.Abs(targetPath)
 	if err != nil {
 		absTarget = targetPath
@@ -273,6 +397,34 @@ func Build(targetPath string) *BuildResult {
 	if dir == "" {
 		dir = "."
 	}
+
+	// Smart Multi-file source resolution:
+	// If targetPath has PROGRAM, target is main and all companion subroutine files are included.
+	// If targetPath is a subroutine file, link it with main program file in same directory.
+	var allSources []string
+	if HasProgramStatement(absTarget) {
+		allSources = append(allSources, absTarget)
+		companions := FindCompanionFiles(absTarget)
+		allSources = append(allSources, companions...)
+	} else {
+		mainProg := FindMainProgramFile(dir, absTarget)
+		if mainProg != "" {
+			allSources = append(allSources, mainProg, absTarget)
+			companions := FindCompanionFiles(mainProg)
+			for _, c := range companions {
+				if c != absTarget {
+					allSources = append(allSources, c)
+				}
+			}
+		} else {
+			allSources = append(allSources, absTarget)
+			companions := FindCompanionFiles(absTarget)
+			allSources = append(allSources, companions...)
+		}
+	}
+
+	res.SourceFiles = allSources
+	res.LinesCompiled = CountTotalLines(allSources)
 
 	compilerInfo, found := FindFortranCompiler()
 	res.CompilerFound = found
@@ -304,28 +456,34 @@ func Build(targetPath string) *BuildResult {
 	tmpBin := filepath.Join(os.TempDir(), fmt.Sprintf("tf77_bin_%d%s", time.Now().UnixNano(), ext))
 	res.BinaryPath = tmpBin
 
+	// Relative filenames for compiler arguments (since cmd.Dir = dir)
+	var sourceArgs []string
+	for _, f := range allSources {
+		sourceArgs = append(sourceArgs, filepath.Base(f))
+	}
+
 	var cmd *exec.Cmd
 	switch compilerInfo.Kind {
 	case "wfl386", "wfl":
 		// Open Watcom 32-bit/16-bit compile & link utility
 		// /d1 : line number debugging info
 		// /fe= : output executable name
-		// /quiet : suppress logo banner if desired
 		feArg := fmt.Sprintf("/fe=%s", tmpBin)
-		cmd = exec.Command(compilerInfo.Path, "/d1", feArg, filepath.Base(absTarget))
+		args := append([]string{"/d1", feArg}, sourceArgs...)
+		cmd = exec.Command(compilerInfo.Path, args...)
 		cmd.Dir = dir
 	case "wfc386":
 		// Compile only, then link
-		objFile := strings.TrimSuffix(filepath.Base(absTarget), filepath.Ext(absTarget)) + ".obj"
-		cmd = exec.Command(compilerInfo.Path, "/d1", filepath.Base(absTarget))
+		args := append([]string{"/d1"}, sourceArgs...)
+		cmd = exec.Command(compilerInfo.Path, args...)
 		cmd.Dir = dir
-		_ = objFile
 	case "gfortran", "f77":
 		// Fallback GNU Fortran compiler
-		cmd = exec.Command(compilerInfo.Path, "-g", "-o", tmpBin, filepath.Base(absTarget))
+		args := append([]string{"-g", "-o", tmpBin}, sourceArgs...)
+		cmd = exec.Command(compilerInfo.Path, args...)
 		cmd.Dir = dir
 	default:
-		cmd = exec.Command(compilerInfo.Path, filepath.Base(absTarget))
+		cmd = exec.Command(compilerInfo.Path, sourceArgs...)
 		cmd.Dir = dir
 	}
 
