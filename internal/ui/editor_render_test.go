@@ -45,16 +45,17 @@ func TestEditorDraw_FocusedCursorAndGutter(t *testing.T) {
 		t.Errorf("expected non-cursor line gutter to NOT have '▸', got %q", r0)
 	}
 
-	// 2. Check Cursor cell highlight:
+	// 2. Check Hardware Cursor:
+	// Screen coordinates for cursor:
 	// lineNumWidth: digits + 2 = 3 + 2 = 5
-	// Cursor is at col 6, so screenX = 5 + 6 = 11
+	// Cursor is at col 6, so screenX = 5 + 6 = 11, screenY = 2
 	cellRune, _, style, _ := screen.GetContent(11, 2)
 	if cellRune != 'W' {
 		t.Errorf("expected cursor cell to contain 'W', got %q", cellRune)
 	}
 	_, bg, _ := style.Decompose()
-	if bg != ColorEditorCursor {
-		t.Errorf("expected cursor cell background %v, got %v", ColorEditorCursor, bg)
+	if bg != ColorEditorBg {
+		t.Errorf("expected cursor cell to have normal background %v, got %v", ColorEditorBg, bg)
 	}
 }
 
@@ -79,14 +80,14 @@ func TestEditorDraw_UnfocusedState(t *testing.T) {
 		t.Errorf("expected no '▸' gutter marker when unfocused, got %q", r)
 	}
 
-	// Cursor cell must NOT have yellow background
+	// Cursor cell has normal editor background
 	cellRune, _, style, _ := screen.GetContent(11, 2)
 	if cellRune != 'W' {
 		t.Errorf("expected 'W', got %q", cellRune)
 	}
 	_, bg, _ := style.Decompose()
-	if bg == ColorEditorCursor {
-		t.Errorf("cursor cell should NOT have ColorEditorCursor when unfocused")
+	if bg != ColorEditorBg {
+		t.Errorf("expected ColorEditorBg when unfocused, got %v", bg)
 	}
 }
 

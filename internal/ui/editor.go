@@ -622,8 +622,6 @@ func (e *Editor) Draw(screen tcell.Screen, x, y, width, height int, focused bool
 					tokStyle = tcell.StyleDefault.Background(tcell.ColorLightCyan).Foreground(tcell.ColorBlack).Bold(true)
 				} else if lineIdx == e.HighlightLine && col >= e.HighlightStartCol && col < e.HighlightEndCol {
 					tokStyle = tcell.StyleDefault.Background(tcell.ColorLightCyan).Foreground(tcell.ColorBlack).Bold(true)
-				} else if focused && lineIdx == e.CursorY && col == e.CursorX && !isIP && !hasBP {
-					tokStyle = tcell.StyleDefault.Background(ColorEditorCursor).Foreground(tcell.ColorBlack).Bold(true)
 				} else {
 					tokStyle = tokStyle.Background(ColorEditorBg)
 				}
@@ -671,9 +669,6 @@ func (e *Editor) Draw(screen tcell.Screen, x, y, width, height int, focused bool
 			for screenX < x+width {
 				fillCol := (screenX - codeStartX) + e.ScrollX
 				fillStyle := lineBaseStyle.Background(ColorEditorBg)
-				if focused && lineIdx == e.CursorY && screenX == actualCursorScreenX && !isIP && !hasBP {
-					fillStyle = tcell.StyleDefault.Background(ColorEditorCursor).Foreground(tcell.ColorBlack).Bold(true)
-				}
 				r := ' '
 				if e.ShowColumnGuides && !isIP && !hasBP {
 					if fillCol == 5 || fillCol == 71 {
