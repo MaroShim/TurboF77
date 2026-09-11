@@ -3,8 +3,9 @@ package debugger
 import (
 	"fmt"
 	"os"
-	"strings"
 	"sync"
+
+	"tf77/internal/compiler"
 )
 
 // Variable represents a variable displayed in Watch window
@@ -28,18 +29,20 @@ type DebugState struct {
 	Output       string
 }
 
-// Debugger manages a debug session for FORTRAN 77 code
+// Debuger manages a debug session for FORTRAN 77 code
 type Debugger struct {
 	mu          sync.Mutex
 	breakpoints map[string]map[int]bool // file -> lines
 	state       DebugState
 	srcFile     string
-	engine      *F77Engine
+	backend     DebuggerBackend
+	backendType BackendType
 }
 
 func NewDebugger() *Debugger {
 	return &Debugger{
 		breakpoints: make(map[string]map[int]bool),
+		backendType: BackendInternal,
 	}
 }
 
@@ -55,6 +58,12 @@ func (d *Debugger) GetState() DebugState {
 	return d.state
 }
 
+func (d *Debugger) GetBackendType() BackendType {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.backendType
+}
+
 func (d *Debugger) ToggleBreakpoint(file string, line int) bool {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -62,32 +71,40 @@ func (d *Debugger) ToggleBreakpoint(file string, line int) bool {
 	if d.breakpoints[file] == nil {
 		d.breakpoints[file] = make(map[int]bool)
 	}
+
+	enabled := false
 	if d.breakpoints[file][line] {
 		delete(d.breakpoints[file], line)
-		if d.engine != nil {
-			delete(d.engine.Breakpoints, line)
-		}
-		return false
+		enabled = false
 	} else {
 		d.breakpoints[file][line] = true
-		if d.engine != nil {
-			d.engine.Breakpoints[line] = true
-		}
-		return true
+		enabled = true
 	}
+
+	if d.backend != nil && file == d.srcFile {
+		_ = d.backend.SetBreakpoint(line, enabled)
+	}
+	return enabled
 }
 
-// StartSession initiates an interactive debug session for the given Fortran file
-func (d *Debugger) StartSession(srcFile string) error {
+// StartSession initiates an interactive debug session.
+// Optional extra arguments:
+//
+//	extra[0]: binPath (compiled binary executable path)
+//	extra[1]: compilerKind ("gfortran", "wfl386", etc.)
+func (d *Debugger) StartSession(srcFile string, extra ...string) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	data, err := os.ReadFile(srcFile)
-	if err != nil {
-		return fmt.Errorf("failed to read source file: %w", err)
+	var binPath string
+	var compilerKind string
+	if len(extra) > 0 {
+		binPath = extra[0]
+	}
+	if len(extra) > 1 {
+		compilerKind = extra[1]
 	}
 
-	rawLines := strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
 	bps := make(map[int]bool)
 	if fileBps, ok := d.breakpoints[srcFile]; ok {
 		for l, set := range fileBps {
@@ -97,21 +114,34 @@ func (d *Debugger) StartSession(srcFile string) error {
 		}
 	}
 
-	d.engine = NewF77Engine(rawLines, bps)
 	d.srcFile = srcFile
 
-	d.state = DebugState{
-		Active:      true,
-		Running:     false,
-		Exited:      d.engine.Exited,
-		ExitCode:    d.engine.ExitCode,
-		CurrentFile: srcFile,
-		CurrentLine: d.engine.CurLine,
-		CurrentFunc: d.engine.ProgName,
-		LocalVars:   d.engine.GetLocalVariables(),
-		Output:      d.engine.OutputBuf.String(),
+	// Priority 1: If binary exists and a native debugger tool (LLDB / GDB) is available, try GdbLldbBackend
+	if binPath != "" {
+		if fi, err := os.Stat(binPath); err == nil && !fi.IsDir() {
+			dbgTool, hasDbgTool := compiler.FindDebuggerTool(compilerKind)
+			if hasDbgTool && (dbgTool.Kind == "lldb" || dbgTool.Kind == "gdb") {
+				nativeBackend := NewGdbLldbBackend(dbgTool)
+				if err := nativeBackend.Start(srcFile, binPath, bps); err == nil {
+					d.backend = nativeBackend
+					d.backendType = BackendGdbLldb
+					d.state = nativeBackend.GetState()
+					return nil
+				}
+				// If native launch fails (e.g. sandbox restriction or attach issue), fall through to internal interpreter
+			}
+		}
 	}
 
+	// Priority 2 / Fallback: Safe, zero-dependency built-in interpreter
+	internalBackend := NewInternalBackend()
+	if err := internalBackend.Start(srcFile, binPath, bps); err != nil {
+		return fmt.Errorf("failed to start internal debug engine: %w", err)
+	}
+
+	d.backend = internalBackend
+	d.backendType = BackendInternal
+	d.state = internalBackend.GetState()
 	return nil
 }
 
@@ -120,32 +150,13 @@ func (d *Debugger) Continue() error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	if d.engine == nil || d.state.Exited {
+	if d.backend == nil || d.state.Exited {
 		return fmt.Errorf("no active debug session")
 	}
 
-	// Step at least once to move off current line
-	if !d.engine.Step() {
-		d.updateStateFromEngine()
-		return nil
-	}
-
-	// Continue until breakpoint or exit
-	maxSteps := 100000
-	for count := 0; count < maxSteps; count++ {
-		if d.engine.Exited {
-			break
-		}
-		if d.engine.Breakpoints[d.engine.CurLine] {
-			break
-		}
-		if !d.engine.Step() {
-			break
-		}
-	}
-
-	d.updateStateFromEngine()
-	return nil
+	err := d.backend.Continue()
+	d.state = d.backend.GetState()
+	return err
 }
 
 // Step (Trace Into) advances one statement
@@ -153,19 +164,27 @@ func (d *Debugger) Step() error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	if d.engine == nil || d.state.Exited {
+	if d.backend == nil || d.state.Exited {
 		return fmt.Errorf("no active debug session")
 	}
 
-	d.engine.Step()
-	d.updateStateFromEngine()
-	return nil
+	err := d.backend.StepInto()
+	d.state = d.backend.GetState()
+	return err
 }
 
-// Next (Step Over) advances one statement or steps through loop body
+// Next (Step Over) advances one statement or steps over function/subroutine
 func (d *Debugger) Next() error {
-	// For Fortran single-file routines, Next behaves similarly to Step
-	return d.Step()
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if d.backend == nil || d.state.Exited {
+		return fmt.Errorf("no active debug session")
+	}
+
+	err := d.backend.StepOver()
+	d.state = d.backend.GetState()
+	return err
 }
 
 // Stop terminates the active debug session
@@ -173,22 +192,12 @@ func (d *Debugger) Stop() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
+	if d.backend != nil {
+		_ = d.backend.Stop()
+	}
 	d.state = DebugState{
 		Active: false,
 		Exited: true,
 	}
-	d.engine = nil
-}
-
-func (d *Debugger) updateStateFromEngine() {
-	if d.engine == nil {
-		return
-	}
-	d.state.Active = d.engine.Active
-	d.state.Exited = d.engine.Exited
-	d.state.ExitCode = d.engine.ExitCode
-	d.state.CurrentLine = d.engine.CurLine
-	d.state.CurrentFunc = d.engine.ProgName
-	d.state.LocalVars = d.engine.GetLocalVariables()
-	d.state.Output = d.engine.OutputBuf.String()
+	d.backend = nil
 }

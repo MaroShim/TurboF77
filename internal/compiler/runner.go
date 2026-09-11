@@ -62,9 +62,67 @@ type CompilerInfo struct {
 	Kind string // "wfl386", "wfc386", "wfl", "gfortran", etc.
 }
 
+// DebuggerInfo contains path and kind of detected debugger tool
+type DebuggerInfo struct {
+	Path string
+	Kind string // "lldb", "gdb", "wd"
+}
+
+// FindDebuggerTool locates the appropriate debugger for the specified compiler
+func FindDebuggerTool(compilerKind string) (DebuggerInfo, bool) {
+	// For GNU / LLVM compilers (gfortran, flang, ifx, f77):
+	if compilerKind == "gfortran" || compilerKind == "flang" || compilerKind == "flang-new" ||
+		compilerKind == "ifx" || compilerKind == "ifort" || compilerKind == "f77" || compilerKind == "" {
+		if runtime.GOOS == "darwin" {
+			// On macOS, prefer native Apple LLDB
+			lldbCandidates := []string{"/usr/bin/lldb", "lldb"}
+			for _, c := range lldbCandidates {
+				if path, err := exec.LookPath(c); err == nil {
+					return DebuggerInfo{Path: path, Kind: "lldb"}, true
+				}
+			}
+			if path, err := exec.LookPath("gdb"); err == nil {
+				return DebuggerInfo{Path: path, Kind: "gdb"}, true
+			}
+		} else {
+			// On Linux/Windows, prefer GDB
+			if path, err := exec.LookPath("gdb"); err == nil {
+				return DebuggerInfo{Path: path, Kind: "gdb"}, true
+			}
+			if path, err := exec.LookPath("lldb"); err == nil {
+				return DebuggerInfo{Path: path, Kind: "lldb"}, true
+			}
+		}
+	}
+
+	// For Open Watcom compilers:
+	if strings.Contains(compilerKind, "wf") || compilerKind == "owcc" {
+		if watcomDir := os.Getenv("WATCOM"); watcomDir != "" {
+			candidates := []string{
+				filepath.Join(watcomDir, "binnt64", "wd.exe"),
+				filepath.Join(watcomDir, "binnt", "wd.exe"),
+				filepath.Join(watcomDir, "binl64", "wd"),
+				filepath.Join(watcomDir, "binl", "wd"),
+				filepath.Join(watcomDir, "binarm64", "wd"),
+				filepath.Join(watcomDir, "binw", "wd.exe"),
+			}
+			for _, c := range candidates {
+				if fi, err := os.Stat(c); err == nil && !fi.IsDir() {
+					return DebuggerInfo{Path: c, Kind: "wd"}, true
+				}
+			}
+		}
+		if path, err := exec.LookPath("wd"); err == nil {
+			return DebuggerInfo{Path: path, Kind: "wd"}, true
+		}
+	}
+
+	return DebuggerInfo{}, false
+}
+
 // FindFortranCompiler locates Open Watcom 2.0 FORTRAN 77 or compatible compiler
 func FindFortranCompiler() (CompilerInfo, bool) {
-	// 1. Check WATCOM environment variable
+	// 1. If user explicitly set WATCOM environment variable, honor it first
 	if watcomDir := os.Getenv("WATCOM"); watcomDir != "" {
 		candidates := []string{
 			filepath.Join(watcomDir, "binnt64", "wfl386.exe"),
@@ -90,7 +148,19 @@ func FindFortranCompiler() (CompilerInfo, bool) {
 		}
 	}
 
-	// 2. Check system PATH for Open Watcom tools
+	// 2. Practical Priority #1: Modern standard compilers (gfortran, flang, ifx)
+	modernBins := []string{"gfortran", "gfortran.exe", "flang-new", "flang", "ifx", "ifort"}
+	for _, bin := range modernBins {
+		if path, err := exec.LookPath(bin); err == nil {
+			kind := bin
+			if strings.HasPrefix(bin, "gfortran") {
+				kind = "gfortran"
+			}
+			return CompilerInfo{Path: path, Kind: kind}, true
+		}
+	}
+
+	// 3. Check system PATH for Open Watcom tools
 	watcomBins := []string{"wfl386", "wfl386.exe", "wfc386", "wfc386.exe", "wfl", "wfl.exe", "owcc", "owcc.exe"}
 	for _, bin := range watcomBins {
 		if path, err := exec.LookPath(bin); err == nil {
@@ -106,7 +176,7 @@ func FindFortranCompiler() (CompilerInfo, bool) {
 		}
 	}
 
-	// 3. Check common standard installation locations
+	// 4. Check common standard Watcom installation locations
 	standardPaths := []string{
 		"/opt/watcom/binl64/wfl386",
 		"/opt/watcom/binl/wfl386",
@@ -121,12 +191,9 @@ func FindFortranCompiler() (CompilerInfo, bool) {
 		}
 	}
 
-	// 4. Check for fallback compilers (gfortran / f77)
-	fallbackBins := []string{"gfortran", "gfortran.exe", "f77"}
-	for _, bin := range fallbackBins {
-		if path, err := exec.LookPath(bin); err == nil {
-			return CompilerInfo{Path: path, Kind: bin}, true
-		}
+	// 5. Classic Unix f77
+	if path, err := exec.LookPath("f77"); err == nil {
+		return CompilerInfo{Path: path, Kind: "f77"}, true
 	}
 
 	return CompilerInfo{}, false

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/mattn/go-runewidth"
@@ -30,7 +31,12 @@ func (w *WatchWindow) SetState(st debugger.DebugState) {
 	if st.Exited {
 		w.StatusText = fmt.Sprintf("Process exited with code %d. [Debug finished]", st.ExitCode)
 	} else if st.CurrentFile != "" {
-		w.StatusText = fmt.Sprintf("Paused at %s:%d in %s", st.CurrentFile, st.CurrentLine, st.CurrentFunc)
+		fname := filepath.Base(st.CurrentFile)
+		fn := st.CurrentFunc
+		if fn == "" {
+			fn = "MAIN"
+		}
+		w.StatusText = fmt.Sprintf("Paused at %s:%d in %s", fname, st.CurrentLine, fn)
 	} else if st.Active {
 		w.StatusText = "Debugging session active (running)..."
 	} else {

@@ -244,7 +244,18 @@ func (a *App) StartDebugging() error {
 		a.debugger.ToggleBreakpoint(absTarget, l)
 	}
 
-	err := a.debugger.StartSession(absTarget)
+	// Attempt to build binary with debug symbols for native compiler backend
+	var binPath string
+	var compilerKind string
+	if cInfo, found := compiler.FindFortranCompiler(); found {
+		compilerKind = cInfo.Kind
+		bRes := compiler.Build(absTarget)
+		if bRes != nil && bRes.Success && bRes.BinaryPath != "" {
+			binPath = bRes.BinaryPath
+		}
+	}
+
+	err := a.debugger.StartSession(absTarget, binPath, compilerKind)
 	if err != nil {
 		return err
 	}
