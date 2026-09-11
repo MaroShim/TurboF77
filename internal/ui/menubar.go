@@ -110,6 +110,8 @@ func NewMenuBar() *MenuBar {
 					{Label: "Toggle Breakpoint", Shortcut: "F4", ActionID: "debug_toggle_bp"},
 					{Label: "Stop Debugger", Shortcut: "Ctrl+F2", ActionID: "debug_stop"},
 					{Label: "Watches Window", ActionID: "debug_watches"},
+					{IsSep: true},
+					{Label: "Engine: Internal (F77)", ActionID: "debug_toggle_engine"},
 				},
 			},
 			{
@@ -424,6 +426,20 @@ func (m *MenuBar) SetColumnGuidesEnabled(enabled bool) {
 					} else {
 						m.Menus[i].Items[j].Label = "Column Guides: OFF"
 					}
+					return
+				}
+			}
+		}
+	}
+}
+
+// SetDebugEngineLabel updates the Engine item label in Debug menu
+func (m *MenuBar) SetDebugEngineLabel(label string) {
+	for i := range m.Menus {
+		if m.Menus[i].Title == "Debug" {
+			for j := range m.Menus[i].Items {
+				if m.Menus[i].Items[j].ActionID == "debug_toggle_engine" {
+					m.Menus[i].Items[j].Label = "Engine: " + label
 					return
 				}
 			}

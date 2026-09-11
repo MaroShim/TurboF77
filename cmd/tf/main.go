@@ -8,6 +8,7 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"tf77/internal/compiler"
+	"tf77/internal/debugger"
 	"tf77/internal/sound"
 	"tf77/internal/ui"
 	"tf77/internal/ui/dialogs"
@@ -196,6 +197,15 @@ func main() {
 		case "debug_watches":
 			watch := app.GetWatchWindow()
 			watch.Visible = !watch.Visible
+		case "debug_toggle_engine":
+			newEng := app.GetDebugger().ToggleEngine()
+			label := "Internal (F77)"
+			if newEng == debugger.BackendGdbLldb {
+				label = "Native (LLDB/GDB)"
+			}
+			app.GetMenuBar().SetDebugEngineLabel(label)
+			app.SetStatusMessage(fmt.Sprintf("Debugger Engine set to: %s", label))
+			sound.PlayBell()
 		case "debug_toggle_bp":
 			currLine := editor.CursorY + 1
 			editor.ToggleBreakpoint(currLine)

@@ -186,3 +186,20 @@ func TestDebugger_GdbLldbBackend(t *testing.T) {
 	t.Logf("After Continue: line=%d func=%s file=%s exited=%v code=%d output=%q",
 		st.CurrentLine, st.CurrentFunc, st.CurrentFile, st.Exited, st.ExitCode, st.Output)
 }
+
+func TestDebugger_PreferredEngineSelection(t *testing.T) {
+	dbg := NewDebugger()
+	if dbg.GetPreferredEngine() != BackendInternal {
+		t.Errorf("expected default preferred engine to be BackendInternal, got %v", dbg.GetPreferredEngine())
+	}
+
+	newEng := dbg.ToggleEngine()
+	if newEng != BackendGdbLldb || dbg.GetPreferredEngine() != BackendGdbLldb {
+		t.Errorf("expected toggled engine to be BackendGdbLldb, got %v", newEng)
+	}
+
+	newEng = dbg.ToggleEngine()
+	if newEng != BackendInternal || dbg.GetPreferredEngine() != BackendInternal {
+		t.Errorf("expected toggled engine to be BackendInternal, got %v", newEng)
+	}
+}

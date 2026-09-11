@@ -37,12 +37,14 @@ type Debugger struct {
 	srcFile     string
 	backend     DebuggerBackend
 	backendType BackendType
+	prefEngine  BackendType // preferred engine: BackendInternal (default) or BackendGdbLldb
 }
 
 func NewDebugger() *Debugger {
 	return &Debugger{
 		breakpoints: make(map[string]map[int]bool),
 		backendType: BackendInternal,
+		prefEngine:  BackendInternal, // Default to built-in interpreter for 100% accurate variable inspection
 	}
 }
 
@@ -62,6 +64,29 @@ func (d *Debugger) GetBackendType() BackendType {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return d.backendType
+}
+
+func (d *Debugger) GetPreferredEngine() BackendType {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.prefEngine
+}
+
+func (d *Debugger) SetPreferredEngine(eng BackendType) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.prefEngine = eng
+}
+
+func (d *Debugger) ToggleEngine() BackendType {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.prefEngine == BackendInternal {
+		d.prefEngine = BackendGdbLldb
+	} else {
+		d.prefEngine = BackendInternal
+	}
+	return d.prefEngine
 }
 
 func (d *Debugger) ToggleBreakpoint(file string, line int) bool {
@@ -116,8 +141,10 @@ func (d *Debugger) StartSession(srcFile string, extra ...string) error {
 
 	d.srcFile = srcFile
 
-	// Priority 1: If binary exists and a native debugger tool (LLDB / GDB) is available, try GdbLldbBackend
-	if binPath != "" {
+	// Check user preferred engine
+	tryNativeFirst := (d.prefEngine == BackendGdbLldb)
+
+	if tryNativeFirst && binPath != "" {
 		if fi, err := os.Stat(binPath); err == nil && !fi.IsDir() {
 			dbgTool, hasDbgTool := compiler.FindDebuggerTool(compilerKind)
 			if hasDbgTool && (dbgTool.Kind == "lldb" || dbgTool.Kind == "gdb") {
@@ -128,21 +155,36 @@ func (d *Debugger) StartSession(srcFile string, extra ...string) error {
 					d.state = nativeBackend.GetState()
 					return nil
 				}
-				// If native launch fails (e.g. sandbox restriction or attach issue), fall through to internal interpreter
 			}
 		}
 	}
 
-	// Priority 2 / Fallback: Safe, zero-dependency built-in interpreter
+	// Built-in interpreter engine (Default): Safe, instant, full variable tracking
 	internalBackend := NewInternalBackend()
-	if err := internalBackend.Start(srcFile, binPath, bps); err != nil {
-		return fmt.Errorf("failed to start internal debug engine: %w", err)
+	if err := internalBackend.Start(srcFile, binPath, bps); err == nil {
+		d.backend = internalBackend
+		d.backendType = BackendInternal
+		d.state = internalBackend.GetState()
+		return nil
 	}
 
-	d.backend = internalBackend
-	d.backendType = BackendInternal
-	d.state = internalBackend.GetState()
-	return nil
+	// If internal engine cannot run (e.g. unsupported complex syntax) and native wasn't tried yet, fallback to native
+	if !tryNativeFirst && binPath != "" {
+		if fi, err := os.Stat(binPath); err == nil && !fi.IsDir() {
+			dbgTool, hasDbgTool := compiler.FindDebuggerTool(compilerKind)
+			if hasDbgTool && (dbgTool.Kind == "lldb" || dbgTool.Kind == "gdb") {
+				nativeBackend := NewGdbLldbBackend(dbgTool)
+				if err := nativeBackend.Start(srcFile, binPath, bps); err == nil {
+					d.backend = nativeBackend
+					d.backendType = BackendGdbLldb
+					d.state = nativeBackend.GetState()
+					return nil
+				}
+			}
+		}
+	}
+
+	return fmt.Errorf("failed to start debug engine (both internal and native failed)")
 }
 
 // Continue executes until the next breakpoint or program completion
