@@ -26,11 +26,11 @@ jobs:
           go-version: '1.24'
           cache: true
 
-      - name: Install gfortran (Ubuntu)
+      - name: Install gfortran and gdb (Ubuntu)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y gfortran
+          sudo apt-get install -y gfortran gdb
 
       - name: Install gfortran (macOS)
         if: runner.os == 'macOS'

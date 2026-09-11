@@ -145,7 +145,7 @@ func (b *GdbLldbBackend) Start(srcFile string, binPath string, allBreakpoints ma
 	if b.isLldb {
 		launchOut, err = b.executeCommand("process launch")
 	} else {
-		launchOut, err = b.executeCommand("run")
+		launchOut, err = b.executeCommand("run\nframe")
 	}
 
 	// Check if launch immediately errored (e.g. sandbox attach failure or missing library)
@@ -176,7 +176,7 @@ func (b *GdbLldbBackend) Continue() error {
 	if b.isLldb {
 		cmdStr = "process continue"
 	} else {
-		cmdStr = "continue"
+		cmdStr = "continue\nframe"
 	}
 
 	out, err := b.executeCommand(cmdStr)
@@ -248,7 +248,7 @@ func (b *GdbLldbBackend) StepOver() error {
 	if b.isLldb {
 		cmdStr = "thread step-over"
 	} else {
-		cmdStr = "next"
+		cmdStr = "next\nframe"
 	}
 
 	out, err := b.executeCommand(cmdStr)
@@ -264,7 +264,7 @@ func (b *GdbLldbBackend) StepOver() error {
 		if b.isLldb {
 			stepOutCmd = "thread step-out"
 		} else {
-			stepOutCmd = "finish"
+			stepOutCmd = "finish\nframe"
 		}
 		outLines, err := b.executeCommand(stepOutCmd)
 		if err != nil {
@@ -292,7 +292,7 @@ func (b *GdbLldbBackend) StepInto() error {
 	if b.isLldb {
 		cmdStr = "thread step-in"
 	} else {
-		cmdStr = "step"
+		cmdStr = "step\nframe"
 	}
 
 	out, err := b.executeCommand(cmdStr)

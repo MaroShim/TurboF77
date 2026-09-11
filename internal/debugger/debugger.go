@@ -193,11 +193,9 @@ func (d *Debugger) StartSession(srcFile string, extra ...string) error {
 		if err := startNative(); err == nil {
 			return nil
 		}
-		// If native failed but it's not multi-file, fall back to internal
-		if !isMultiFile {
-			if err := startInternal(); err == nil {
-				return nil
-			}
+		// If native failed, fall back to internal
+		if err := startInternal(); err == nil {
+			return nil
 		}
 	} else {
 		// 2. Default: prefEngine == BackendInternal (Safe, instant, 100% accurate variable inspection)
