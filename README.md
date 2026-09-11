@@ -50,9 +50,10 @@ Both binaries **auto-switch mode** based on the file extension whenever you open
   * gfortran builds isolate `.mod` files in a temporary directory (`-J <tmpDir>`) to prevent workspace pollution
 
 * **Multi-Backend Interactive Debugger & Watches Window**:
-  * **Priority 1 (Native)**: Spawns `lldb` (macOS) or `gdb` (Linux/Windows) against the compiled binary for true source-level debugging: breakpoints, step over, step into, continue, variable inspection via DWARF symbols
-  * **Priority 2 (Fallback)**: Built-in pure-Go FORTRAN 77 interpreter engine — zero external dependencies, always available
-  * Transparent automatic fallback: if the native debugger fails (missing tool, sandbox restriction), the internal interpreter activates silently
+  * **Default Engine (Internal F77)**: Built-in pure-Go interpreter engine — zero external dependencies, sub-millisecond step execution, and 100% full real-time variable/array tracking in the Watches window.
+  * **Native Engine (LLDB / GDB)**: Subprocess backend for compiling and debugging native binaries via Apple LLDB (macOS) or GDB (Linux/Windows). Ideal for binary crash tracing and deep system inspection.
+  * **Engine Toggle**: Switch engines anytime via `Debug ➔ Engine: Internal (F77) / Native (LLDB/GDB)`.
+  * **Note on Apple LLDB (macOS)**: macOS's standard LLDB does not ship with a Fortran95 TypeSystem plugin (`frame variable` cannot decode Fortran types); the default **Internal** engine is recommended on macOS for full variable inspection in the Watches window. On Linux, GDB fully inspects Fortran variables natively.
   * **F4**: Toggle breakpoint (full-width red bar `●`)
   * **F5**: Start debugging / Continue to next breakpoint
   * **F7**: Trace Into, **F8**: Step Over, **Ctrl+F2**: Reset
@@ -230,9 +231,10 @@ If `$WATCOM` is set, Open Watcom takes priority over other compilers. Without it
   * gfortran 빌드 시 `.mod` 파일을 임시 디렉터리(`-J <tmpDir>`)에 격리하여 작업 폴더 오염 방지
 
 * **다중 백엔드 인터랙티브 디버거 & Watches Window**:
-  * **1순위 (네이티브)**: `lldb`(macOS) 또는 `gdb`(Linux/Windows) 자식 프로세스를 통해 진정한 소스 레벨 디버깅 — DWARF 심볼 기반 브레이크포인트, 스텝 실행, 변수 감시
-  * **2순위 (Fallback)**: 내장 순수 Go 포트란 77 인터프리터 엔진 — 외부 툴 불필요, 항상 사용 가능
-  * 외부 디버거 실패(툴 미설치, 샌드박스 제한 등) 시 자동으로 내장 인터프리터로 전환
+  * **기본 엔진 (Internal F77)**: 내장 순수 Go 인터프리터 엔진 — 외부 툴 불필요, 0.001초 미만의 초고속 스텝 실행, 하단 Watches 창에서 포트란 변수명, 타입, 현재 값을 **100% 완벽하게 실시간 추적**.
+  * **네이티브 엔진 (LLDB / GDB)**: 실제 컴파일된 바이너리를 `lldb`(macOS) 또는 `gdb`(Linux/Windows) 자식 프로세스로 구동하는 백엔드. 네이티브 크래시 분석 및 머신 레벨 디버깅에 적합.
+  * **디버거 엔진 즉시 전환**: 상단 메뉴 `Debug ➔ Engine: Internal (F77) / Native (LLDB/GDB)` 항목을 통해 언제든 자유롭게 전환 가능.
+  * **macOS Apple LLDB 안내**: macOS 기본 Apple LLDB에는 `fortran95` TypeSystem 플러그인이 포함되어 있지 않아 LLDB 자체적으로 포트란 변수 타입을 디코딩하지 못합니다. 따라서 macOS 환경에서 변수/배열 값 감시(Watches)가 필요할 때는 기본값인 **Internal** 엔진 사용을 권장합니다. (Linux 환경의 GDB는 포트란 변수를 네이티브로 완벽 지원합니다.)
   * **F4**: 브레이크포인트 설정/해제(`●`), **F5**: 디버깅 시작/계속, **F7**: Trace Into, **F8**: Step Over, **Ctrl+F2**: 리셋
   * 실행 중 현재 라인: 노란색 바(`►`) 강조
   * 하단 **Watches 윈도우**: 변수명, 타입, 값 실시간 감시
