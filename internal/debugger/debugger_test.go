@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"tf77/internal/compiler"
 )
@@ -154,8 +155,10 @@ func TestDebugger_GdbLldbBackend(t *testing.T) {
 		t.Skipf("build failed with gfortran: %v", bRes)
 	}
 
+	t0 := time.Now()
 	backend := NewGdbLldbBackend(dbgTool)
 	err := backend.Start(srcFile, bRes.BinaryPath, map[int]bool{4: true})
+	t.Logf("Start() took: %v", time.Since(t0))
 	if err != nil {
 		// In restricted environments (like seatbelt sandbox), attach may fail
 		t.Logf("native debugger backend start returned error (expected in sandbox): %v", err)
@@ -169,12 +172,16 @@ func TestDebugger_GdbLldbBackend(t *testing.T) {
 	}
 
 	// Test step over
+	t1 := time.Now()
 	_ = backend.StepOver()
+	t.Logf("StepOver() took: %v", time.Since(t1))
 	st = backend.GetState()
 	t.Logf("After StepOver: line=%d func=%s file=%s exited=%v", st.CurrentLine, st.CurrentFunc, st.CurrentFile, st.Exited)
 
 	// Test continue to exit
+	t2 := time.Now()
 	_ = backend.Continue()
+	t.Logf("Continue() took: %v", time.Since(t2))
 	st = backend.GetState()
 	t.Logf("After Continue: line=%d func=%s file=%s exited=%v code=%d output=%q",
 		st.CurrentLine, st.CurrentFunc, st.CurrentFile, st.Exited, st.ExitCode, st.Output)

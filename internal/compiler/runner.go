@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"os/exec"
@@ -534,8 +535,29 @@ func Build(targetPath string) *BuildResult {
 	if runtime.GOOS == "windows" {
 		ext = ".exe"
 	}
-	tmpBin := filepath.Join(os.TempDir(), fmt.Sprintf("tf77_bin_%d%s", time.Now().UnixNano(), ext))
+
+	// Deterministic binary name per target to enable incremental build (Rule 72)
+	hash := sha256.Sum256([]byte(absTarget))
+	binName := fmt.Sprintf("tf77_bin_%x%s", hash[:8], ext)
+	tmpBin := filepath.Join(os.TempDir(), binName)
 	res.BinaryPath = tmpBin
+
+	// Check if existing binary is newer than all source files
+	if binFi, err := os.Stat(tmpBin); err == nil && !binFi.IsDir() {
+		binMtime := binFi.ModTime()
+		upToDate := true
+		for _, sf := range allSources {
+			if sFi, err := os.Stat(sf); err != nil || sFi.ModTime().After(binMtime) {
+				upToDate = false
+				break
+			}
+		}
+		if upToDate {
+			res.Success = true
+			res.Duration = time.Since(start)
+			return res
+		}
+	}
 
 	// Relative filenames for compiler arguments (since cmd.Dir = dir)
 	var sourceArgs []string

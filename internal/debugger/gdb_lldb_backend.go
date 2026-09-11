@@ -95,6 +95,8 @@ func (b *GdbLldbBackend) Start(srcFile string, binPath string, bps map[int]bool)
 		_, _ = b.executeCommand("settings set auto-confirm true")
 		_, _ = b.executeCommand("settings set stop-line-count-before 0")
 		_, _ = b.executeCommand("settings set stop-line-count-after 0")
+		// Enable synchronous mode so commands wait for process state change before returning
+		_, _ = b.executeCommand("script lldb.debugger.SetAsync(False)")
 		// Break at entry routines in Fortran (gfortran uses MAIN__)
 		_, _ = b.executeCommand("breakpoint set -n MAIN__")
 		_, _ = b.executeCommand("breakpoint set -n main")
@@ -132,7 +134,9 @@ func (b *GdbLldbBackend) Start(srcFile string, binPath string, bps map[int]bool)
 	}
 
 	b.parseCurrentLocation(launchOut)
-	b.queryVariables()
+	if !b.state.Exited {
+		b.queryVariables()
+	}
 	b.initialized = true
 
 	return nil
@@ -160,7 +164,9 @@ func (b *GdbLldbBackend) Continue() error {
 	}
 
 	b.parseCurrentLocation(out)
-	b.queryVariables()
+	if !b.state.Exited {
+		b.queryVariables()
+	}
 	return nil
 }
 
@@ -186,7 +192,9 @@ func (b *GdbLldbBackend) StepOver() error {
 	}
 
 	b.parseCurrentLocation(out)
-	b.queryVariables()
+	if !b.state.Exited {
+		b.queryVariables()
+	}
 	return nil
 }
 
@@ -212,7 +220,9 @@ func (b *GdbLldbBackend) StepInto() error {
 	}
 
 	b.parseCurrentLocation(out)
-	b.queryVariables()
+	if !b.state.Exited {
+		b.queryVariables()
+	}
 	return nil
 }
 
@@ -262,6 +272,7 @@ func (b *GdbLldbBackend) SetBreakpoint(line int, enabled bool) error {
 }
 
 func (b *GdbLldbBackend) readOutputLoop() {
+	defer close(b.lineChan)
 	scanner := bufio.NewScanner(b.stdout)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -298,10 +309,18 @@ func (b *GdbLldbBackend) executeCommand(cmdStr string) (string, error) {
 			if !ok {
 				return strings.Join(outLines, "\n"), nil
 			}
-			if strings.TrimSpace(line) == cmdDelimiter {
+			trimmed := strings.TrimSpace(line)
+			if trimmed == cmdDelimiter {
 				return strings.Join(outLines, "\n"), nil
 			}
 			outLines = append(outLines, line)
+
+			// Fast exit detection: if the process reported exit or termination,
+			// don't wait for delimiter or timeout
+			if reExitLldb.MatchString(trimmed) || reExitGdb.MatchString(trimmed) ||
+				strings.Contains(trimmed, "exited normally") {
+				return strings.Join(outLines, "\n"), nil
+			}
 		case <-timeout:
 			return strings.Join(outLines, "\n"), nil
 		}

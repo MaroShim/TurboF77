@@ -156,3 +156,29 @@ func TestModularExampleFiles(t *testing.T) {
 		t.Errorf("expected 0 companions for hello.for, got %d: %v", len(standaloneCompanions), standaloneCompanions)
 	}
 }
+
+func TestIncrementalBuild(t *testing.T) {
+	_, hasCompiler := FindFortranCompiler()
+	if !hasCompiler {
+		t.Skip("no fortran compiler found on system")
+	}
+
+	tempDir := t.TempDir()
+	src := tempDir + "/test_inc.for"
+	_ = os.WriteFile(src, []byte("      PROGRAM INC\n      PRINT *, 'TEST'\n      END\n"), 0644)
+
+	// First build: compiles
+	res1 := Build(src)
+	if res1 == nil || !res1.Success {
+		t.Fatalf("first build failed: %+v", res1)
+	}
+
+	// Second build immediately without changes: should be incremental (duration near 0, Success=true)
+	res2 := Build(src)
+	if res2 == nil || !res2.Success {
+		t.Fatalf("second build failed: %+v", res2)
+	}
+	if res1.BinaryPath != res2.BinaryPath {
+		t.Errorf("expected same binary path %q, got %q", res1.BinaryPath, res2.BinaryPath)
+	}
+}
