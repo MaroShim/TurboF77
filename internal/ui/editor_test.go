@@ -220,3 +220,95 @@ func TestUndoRedo(t *testing.T) {
 	}
 }
 
+// TestF12NavigationAndUndoRegression tests the multi-file jump, editing, and round-trip stack integrity in Fortran 77
+func TestF12NavigationAndUndoRegression(t *testing.T) {
+	tmpDir := t.TempDir()
+	fileA := filepath.Join(tmpDir, "main.f")
+	fileB := filepath.Join(tmpDir, "math.f")
+
+	codeA := "      PROGRAM MAIN\n      CALL CALC\n      END\n"
+	codeB := "      SUBROUTINE CALC\n      PRINT *, 42\n      END\n"
+
+	if err := os.WriteFile(fileA, []byte(codeA), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fileB, []byte(codeB), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	ed := NewEditor("", 1)
+	if err := ed.LoadFile(fileA); err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Move cursor to 'CALL CALC' on line 2 (index 1)
+	ed.CursorY = 1
+	ed.CursorX = 6
+
+	// 2. Perform edit on File A: insert comments
+	ed.InsertRune('C')
+	ed.InsertRune(' ')
+	if !ed.Dirty {
+		t.Errorf("expected ed.Dirty to be true after edit on File A")
+	}
+
+	// 3. Trigger F12: Push current location and jump to File B
+	ed.PushNavLocation()
+	if err := ed.LoadFile(fileB); err != nil {
+		t.Fatal(err)
+	}
+	ed.GotoLine(1, 7) // Jumped to SUBROUTINE CALC definition
+
+	if ed.FilePath != fileB || ed.CursorY != 0 {
+		t.Fatalf("expected jump to %s line 1, got %s line %d", fileB, ed.FilePath, ed.CursorY+1)
+	}
+
+	// 4. Perform second jump within File B to print statement (line 2)
+	ed.PushNavLocation()
+	ed.GotoLine(2, 6)
+
+	// 5. Perform edit in File B: insert "C ok"
+	for _, r := range "C ok" {
+		ed.InsertRune(r)
+	}
+	// Undo in File B
+	for i := 0; i < 4; i++ {
+		if !ed.Undo() {
+			t.Fatalf("expected Undo in File B to succeed")
+		}
+	}
+
+	// 6. Navigate Back 1: should return to line 1 in File B
+	if !ed.NavigateBack() {
+		t.Fatalf("expected NavigateBack to step 1 to succeed")
+	}
+	if ed.FilePath != fileB || ed.CursorY != 0 {
+		t.Errorf("expected File B line 1, got %s line %d", ed.FilePath, ed.CursorY+1)
+	}
+
+	// 7. Navigate Back 2: should return to File A at line 2
+	if !ed.NavigateBack() {
+		t.Fatalf("expected NavigateBack to File A to succeed")
+	}
+	if ed.FilePath != fileA || ed.CursorY != 1 {
+		t.Errorf("expected File A line 2, got %s line %d", ed.FilePath, ed.CursorY+1)
+	}
+
+	// 8. Undo edit on File A: undo the two characters ('C', ' ')
+	if !ed.Undo() || !ed.Undo() {
+		t.Fatalf("expected Undo in File A to succeed")
+	}
+	if ed.Lines[1] != "      CALL CALC" {
+		t.Errorf("expected line 2 restored to '      CALL CALC', got %q", ed.Lines[1])
+	}
+
+	// 9. Navigate Forward: should move back into File B
+	if !ed.NavigateForward() {
+		t.Fatalf("expected NavigateForward into File B to succeed")
+	}
+	if ed.FilePath != fileB || ed.CursorY != 0 {
+		t.Errorf("expected Forward into File B line 1, got %s line %d", ed.FilePath, ed.CursorY+1)
+	}
+}
+
+
