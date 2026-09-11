@@ -73,6 +73,12 @@ var (
 	ColorEditorLineNumFg  = tcell.ColorLightCyan
 	ColorEditorBreakpoint = tcell.ColorRed
 	ColorEditorCurrentIP  = tcell.ColorYellow
+	// F77 fixed-form: label/continuation zone (cols 1-6) and overflow zone (col 73+)
+	// Computed as 15% white blended into #0000A8:
+	//   R = round(0*0.85 + 255*0.15) = 38 = 0x26
+	//   G = round(0*0.85 + 255*0.15) = 38 = 0x26
+	//   B = round(168*0.85 + 255*0.15) = 181 = 0xB5
+	ColorEditorF77Zone    = tcell.NewHexColor(0x2626B5)
 
 	// Status Bar (Bottom)
 	ColorStatusBarBg     = tcell.ColorLightGray

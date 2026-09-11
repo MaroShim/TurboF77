@@ -933,6 +933,15 @@ func (e *Editor) Draw(screen tcell.Screen, x, y, width, height int, focused bool
 			if tabW <= 0 {
 				tabW = 4
 			}
+
+			// isF77Zone reports whether logical column col (0-based) falls in the
+			// F77 fixed-form zones: cols 0-5 (label/continuation) or col 72+
+			// (continuation-column overflow / identifier zone).
+			// Only active when ShowColumnGuides is on (i.e. !IsFreeForm).
+			isF77Zone := func(col int) bool {
+				return e.ShowColumnGuides && col <= 5 || (e.ShowColumnGuides && col >= 72)
+			}
+
 			for col := e.ScrollX; col < len(tokens) && screenX < x+width; col++ {
 				tok := tokens[col]
 				tokStyle := tok.Style
@@ -947,6 +956,8 @@ func (e *Editor) Draw(screen tcell.Screen, x, y, width, height int, focused bool
 					tokStyle = tcell.StyleDefault.Background(tcell.ColorLightCyan).Foreground(tcell.ColorBlack).Bold(true)
 				} else if lineIdx == e.HighlightLine && col >= e.HighlightStartCol && col < e.HighlightEndCol {
 					tokStyle = tcell.StyleDefault.Background(tcell.ColorLightCyan).Foreground(tcell.ColorBlack).Bold(true)
+				} else if isF77Zone(visCol) {
+					tokStyle = tokStyle.Background(ColorEditorF77Zone)
 				} else {
 					tokStyle = tokStyle.Background(ColorEditorBg)
 				}
@@ -993,7 +1004,15 @@ func (e *Editor) Draw(screen tcell.Screen, x, y, width, height int, focused bool
 			// Fill rest of the line with editor background and column guides
 			for screenX < x+width {
 				fillCol := (screenX - codeStartX) + e.ScrollX
-				fillStyle := lineBaseStyle.Background(ColorEditorBg)
+				var fillBg tcell.Color
+				if isIP || hasBP {
+					_, fillBg, _ = lineBaseStyle.Decompose()
+				} else if isF77Zone(fillCol) {
+					fillBg = ColorEditorF77Zone
+				} else {
+					fillBg = ColorEditorBg
+				}
+				fillStyle := lineBaseStyle.Background(fillBg)
 				r := ' '
 				if e.ShowColumnGuides && !isIP && !hasBP {
 					if fillCol == 5 || fillCol == 71 {
@@ -1011,7 +1030,13 @@ func (e *Editor) Draw(screen tcell.Screen, x, y, width, height int, focused bool
 			for col := codeStartX + 1; col < x+width; col++ {
 				zoneCol := (col - codeStartX) + e.ScrollX
 				r := ' '
-				style := baseStyle.Background(ColorEditorBg)
+				var bg tcell.Color
+				if e.ShowColumnGuides && (zoneCol <= 5 || zoneCol >= 72) {
+					bg = ColorEditorF77Zone
+				} else {
+					bg = ColorEditorBg
+				}
+				style := baseStyle.Background(bg)
 				if e.ShowColumnGuides {
 					if zoneCol == 5 || zoneCol == 71 {
 						r = RuneColumnGuide

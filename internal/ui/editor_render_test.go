@@ -115,12 +115,23 @@ func TestEditorDraw_ColumnGuides(t *testing.T) {
 	if rCol6 != RuneColumnGuide {
 		t.Errorf("expected RuneColumnGuide at column index 5 (col 6), got %q (rune %d)", rCol6, rCol6)
 	}
-	fg6, _, _ := styleCol6.Decompose()
+	fg6, bg6, _ := styleCol6.Decompose()
 	if fg6 != ColorEditorGuideLine {
 		t.Errorf("expected guide line foreground color %v, got %v", ColorEditorGuideLine, fg6)
 	}
+	if bg6 != ColorEditorF77Zone {
+		t.Errorf("expected F77 zone background color %v at col 5, got %v", ColorEditorF77Zone, bg6)
+	}
+
+	// Index 6 (Column 7 in F77: statement area) must have default ColorEditorBg
+	_, _, styleCol7, _ := screen.GetContent(6, 2)
+	_, bg7, _ := styleCol7.Decompose()
+	if bg7 != ColorEditorBg {
+		t.Errorf("expected statement area background %v at col 6, got %v", ColorEditorBg, bg7)
+	}
 
 	// Index 71 (Column 72 in F77 1-based convention) in empty line area must display RuneColumnGuide
+	// Column 71 is inside the 72-col boundary, so its bg is ColorEditorBg, while col 72+ is ColorEditorF77Zone
 	rCol72, _, styleCol72, _ := screen.GetContent(71, 2)
 	if rCol72 != RuneColumnGuide {
 		t.Errorf("expected RuneColumnGuide at column index 71 (col 72), got %q (rune %d)", rCol72, rCol72)
@@ -128,6 +139,13 @@ func TestEditorDraw_ColumnGuides(t *testing.T) {
 	fg72, _, _ := styleCol72.Decompose()
 	if fg72 != ColorEditorGuideLine {
 		t.Errorf("expected guide line foreground color %v, got %v", ColorEditorGuideLine, fg72)
+	}
+
+	// Index 72 (Column 73 in F77: overflow zone) must have ColorEditorF77Zone
+	_, _, styleCol73, _ := screen.GetContent(72, 2)
+	_, bg73, _ := styleCol73.Decompose()
+	if bg73 != ColorEditorF77Zone {
+		t.Errorf("expected overflow area background %v at col 72, got %v", ColorEditorF77Zone, bg73)
 	}
 
 	// Below EOF (e.g. screenY = 5)
