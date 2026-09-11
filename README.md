@@ -1,4 +1,4 @@
-# Turbo F77 (tf77) 🚀
+# Turbo F77 (tf77)
 
 > **Retro Borland Turbo Vision TUI IDE for FORTRAN 77**
 
@@ -8,7 +8,7 @@ Built as a self-contained Go binary using `tcell`, Turbo F77 features the iconic
 
 ---
 
-## 📸 Key Features
+## Key Features
 
 * **Authentic Borland Turbo Vision TUI**:
   * Classic Turbo Blue editor canvas (`#0000A8`) with double-line borders (`╔═╗`, `║ ║`, `╚═╝`)
@@ -58,7 +58,7 @@ Built as a self-contained Go binary using `tcell`, Turbo F77 features the iconic
 
 ---
 
-## ⌨️ Keyboard Shortcuts
+## Keyboard Shortcuts
 
 | Shortcut | Action | Description |
 |---|---|---|
@@ -97,7 +97,7 @@ Built as a self-contained Go binary using `tcell`, Turbo F77 features the iconic
 
 ---
 
-## 🛠️ Build and Installation
+## Build and Installation
 
 ### Prerequisites
 * Go 1.20 or newer
@@ -116,7 +116,7 @@ go build -o bin/tf77 ./cmd/tf77
 
 ---
 
-## ⚙️ Open Watcom 2.0 Setup
+## Open Watcom 2.0 Setup
 
 If Open Watcom 2.0 is installed, set the `WATCOM` environment variable so `tf77` can automatically detect `wfl386`:
 
@@ -129,7 +129,7 @@ If Open Watcom is not installed, `tf77` will automatically fall back to `gfortra
 
 ---
 
-## 📚 Example Projects
+## Example Projects
 
 * `main.for`: Default starter template calculating cumulative sums
 * `examples/hello.for`: Classic Hello World in FORTRAN 77
@@ -143,7 +143,7 @@ If Open Watcom is not installed, `tf77` will automatically fall back to `gfortra
 ---
 ---
 
-# Turbo F77 (tf77) - 한국어 안내 🚀
+# Turbo F77 (tf77) - 한국어 안내
 
 > **FORTRAN 77을 위한 볼랜드 터보 비전(Turbo Vision) 레트로 TUI IDE**
 
@@ -153,7 +153,7 @@ If Open Watcom is not installed, `tf77` will automatically fall back to `gfortra
 
 ---
 
-## 📸 주요 특징
+## 주요 특징
 
 * **Classic Borland Turbo Vision UI**:
   * 시그니처 터보 블루 에디터 캔버스 (`#0000A8`) 및 이중선 박스 드로잉 (`╔═╗`, `║ ║`, `╚═╝`)
@@ -208,7 +208,7 @@ If Open Watcom is not installed, `tf77` will automatically fall back to `gfortra
 
 ---
 
-## ⌨️ 단축키 안내
+## 단축키 안내
 
 | 단축키 | 기능 | 설명 |
 |---|---|---|
@@ -247,7 +247,7 @@ If Open Watcom is not installed, `tf77` will automatically fall back to `gfortra
 
 ---
 
-## 🛠️ 빌드 및 실행
+## 빌드 및 실행
 
 ```bash
 # 1. 빌드
@@ -262,7 +262,7 @@ go build -o bin/tf77 ./cmd/tf77
 
 ---
 
-## ⚙️ Open Watcom 2.0 FORTRAN 77 설정
+## Open Watcom 2.0 FORTRAN 77 설정
 
 Open Watcom 2.0이 설치되어 있는 경우 환경 변수를 지정해 두면 `tf77`가 자동으로 탐색하여 빌드를 수행합니다:
 
@@ -275,7 +275,7 @@ export PATH=$WATCOM/binl64:$PATH
 
 ---
 
-## 📚 예제 코드
+## 예제 코드
 
 * `main.for`: 누적 합 계산 및 시작 템플릿
 * `examples/hello.for`: 기본 Hello World 포트란 77
