@@ -61,6 +61,9 @@ func TestIsFortranSource(t *testing.T) {
 		{"MAIN.F", true},
 		{"TEST.F77", true},
 		{"header.inc", true},
+		{"module.f90", true},
+		{"modern.F95", true},
+		{"calc.f08", true},
 		{"main.go", false},
 		{"test.rs", false},
 	}
@@ -70,6 +73,16 @@ func TestIsFortranSource(t *testing.T) {
 		if got != c.expected {
 			t.Errorf("IsFortranSource(%s) = %v, expected %v", c.path, got, c.expected)
 		}
+	}
+
+	if !IsFreeFormFortran("math.f90") || !IsFreeFormFortran("algo.F95") {
+		t.Errorf("expected IsFreeFormFortran to be true for f90/f95")
+	}
+	if IsFreeFormFortran("legacy.for") || IsFreeFormFortran("classic.f") {
+		t.Errorf("expected IsFreeFormFortran to be false for .for/.f")
+	}
+	if !IsFixedFormFortran("legacy.for") || !IsFixedFormFortran("classic.f") {
+		t.Errorf("expected IsFixedFormFortran to be true for .for/.f")
 	}
 }
 

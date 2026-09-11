@@ -75,14 +75,13 @@ func FindDefinitionInProject(currentFilePath, symbol string) (defFile string, de
 	}
 
 	escaped := regexp.QuoteMeta(symbol)
-	// Fortran subroutine, function, program, entry:
+	// Fortran subroutine, function, program, entry, module, interface, type:
 	// Example:
 	//   SUBROUTINE PRINTSUM(...)
 	//   INTEGER FUNCTION CALCSUM(...)
-	//   DOUBLE PRECISION FUNCTION CALCSUM(...)
-	//   PROGRAM MODULAR
-	//   ENTRY FOO(...)
-	defPattern := regexp.MustCompile(`(?i)^\s*(?:\d+\s+)?(?:(?:integer|real(?:\*[0-9]+)?|double\s+precision|logical|character(?:\*\(?[0-9*]+\)?)?|complex)\s+)?(?:subroutine|function|program|entry|block\s+data)\s+` + escaped + `\b`)
+	//   MODULE MATH_MOD
+	//   TYPE MY_TYPE
+	defPattern := regexp.MustCompile(`(?i)^\s*(?:\d+\s+)?(?:(?:integer|real(?:\*[0-9]+)?|double\s+precision|logical|character(?:\*\(?[0-9*]+\)?)?|complex)\s+)?(?:subroutine|function|program|entry|block\s+data|module|interface|type(?:\s*,\s*[^:]+::|\s+))\s*` + escaped + `\b`)
 
 	for _, f := range files {
 		file, err := os.Open(f)

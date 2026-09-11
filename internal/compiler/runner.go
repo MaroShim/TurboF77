@@ -199,10 +199,21 @@ func FindFortranCompiler() (CompilerInfo, bool) {
 	return CompilerInfo{}, false
 }
 
-// IsFortranSource checks if a filename is a Fortran 77 source file
-func IsFortranSource(path string) bool {
+// IsFreeFormFortran checks if a filename represents Free-Form Fortran (F90, F95, F2003, F2008, F2018)
+func IsFreeFormFortran(path string) bool {
+	ext := strings.ToLower(filepath.Ext(path))
+	return ext == ".f90" || ext == ".f95" || ext == ".f03" || ext == ".f08" || ext == ".f18"
+}
+
+// IsFixedFormFortran checks if a filename represents Fixed-Form Fortran (F77 and earlier)
+func IsFixedFormFortran(path string) bool {
 	ext := strings.ToLower(filepath.Ext(path))
 	return ext == ".for" || ext == ".f" || ext == ".f77" || ext == ".for77" || ext == ".ftn" || ext == ".inc"
+}
+
+// IsFortranSource checks if a filename is any recognized Fortran source file
+func IsFortranSource(path string) bool {
+	return IsFixedFormFortran(path) || IsFreeFormFortran(path)
 }
 
 // HasProgramStatement checks if a Fortran source file contains a PROGRAM statement
@@ -211,16 +222,19 @@ func HasProgramStatement(path string) bool {
 	if err != nil {
 		return false
 	}
+	isFree := IsFreeFormFortran(path)
 	lines := strings.Split(string(content), "\n")
 	for _, rawLine := range lines {
 		line := strings.TrimRight(rawLine, "\r")
 		if len(line) == 0 {
 			continue
 		}
-		// In F77, comment in column 1 (0-indexed)
-		first := line[0]
-		if first == 'C' || first == 'c' || first == '*' || first == '!' {
-			continue
+		if !isFree {
+			// In F77, comment in column 1 (0-indexed)
+			first := line[0]
+			if first == 'C' || first == 'c' || first == '*' || first == '!' {
+				continue
+			}
 		}
 		// Strip inline comment
 		if idx := strings.Index(line, "!"); idx >= 0 {
@@ -273,7 +287,7 @@ func FindCompanionFiles(targetPath string) []string {
 		}
 		ext := strings.ToLower(filepath.Ext(name))
 		// Only compile source files, exclude .inc headers
-		if ext != ".for" && ext != ".f" && ext != ".f77" && ext != ".for77" && ext != ".ftn" {
+		if !IsFortranSource(name) || ext == ".inc" {
 			continue
 		}
 		fullPath := filepath.Join(dir, name)
@@ -301,7 +315,7 @@ func FindMainProgramFile(dir string, excludePath string) string {
 			continue
 		}
 		ext := strings.ToLower(filepath.Ext(name))
-		if ext != ".for" && ext != ".f" && ext != ".f77" && ext != ".for77" && ext != ".ftn" {
+		if !IsFortranSource(name) || ext == ".inc" {
 			continue
 		}
 		fullPath := filepath.Join(dir, name)
@@ -544,9 +558,14 @@ func Build(targetPath string) *BuildResult {
 		args := append([]string{"/d1"}, sourceArgs...)
 		cmd = exec.Command(compilerInfo.Path, args...)
 		cmd.Dir = dir
-	case "gfortran", "f77":
-		// Fallback GNU Fortran compiler
-		args := append([]string{"-g", "-o", tmpBin}, sourceArgs...)
+	case "gfortran", "f77", "flang", "flang-new", "ifx", "ifort":
+		// GNU Fortran & Modern Fortran compilers
+		// Isolate module (.mod) artifacts in temporary directory to prevent pollution (Rules 73, 76)
+		tmpModDir := filepath.Join(os.TempDir(), fmt.Sprintf("tf_mods_%d", time.Now().UnixNano()))
+		_ = os.MkdirAll(tmpModDir, 0755)
+		defer os.RemoveAll(tmpModDir)
+
+		args := append([]string{"-g", "-J", tmpModDir, "-I", tmpModDir, "-o", tmpBin}, sourceArgs...)
 		cmd = exec.Command(compilerInfo.Path, args...)
 		cmd.Dir = dir
 	default:

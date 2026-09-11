@@ -27,6 +27,7 @@ type Editor struct {
 	ShowColumnGuides bool
 	WindowNumber     int
 	TabWidth         int // Default 4
+	IsFreeForm       bool // true for F90+ free-form, false for F77 fixed-form
 
 	// Breakpoint tracking
 	Breakpoints     map[int]bool            // 1-based line number -> is breakpoint for CURRENT file
@@ -94,15 +95,81 @@ func ExpandTabs(s string, tabWidth int) string {
 	return b.String()
 }
 
+// updateModeFromFilename detects the source form (free or fixed) from the file extension
+// and adjusts editor mode flags accordingly.
+func (e *Editor) updateModeFromFilename(name string) {
+	ext := strings.ToLower(filepath.Ext(name))
+	switch ext {
+	case ".f90", ".f95", ".f03", ".f08", ".f18":
+		e.IsFreeForm = true
+		e.ShowColumnGuides = false
+	default:
+		// .for, .f, .f77, .ftn, .inc, and unknown → Fixed-Form
+		e.IsFreeForm = false
+		e.ShowColumnGuides = true
+	}
+}
+
+// defaultF77Template returns a starter Fortran 77 fixed-form buffer.
+func defaultF77Template(title string) []string {
+	return []string{
+		"C =======================================================",
+		"C  " + title,
+		"C =======================================================",
+		"      PROGRAM HELLO",
+		"      PRINT *, '****************************************'",
+		"      PRINT *, '*      HELLO, TURBO FORTRAN 77!        *'",
+		"      PRINT *, '****************************************'",
+		"      STOP",
+		"      END",
+	}
+}
+
+// defaultF90Template returns a starter Fortran 90+ free-form buffer.
+func defaultF90Template(title string) []string {
+	return []string{
+		"! =======================================================",
+		"! " + title,
+		"! =======================================================",
+		"program hello",
+		"    implicit none",
+		"    print *, '****************************************'",
+		"    print *, '*     Hello, Turbo Fortran (F90)!      *'",
+		"    print *, '****************************************'",
+		"    stop",
+		"end program hello",
+	}
+}
+
 func NewEditor(filePath string, windowNum int) *Editor {
+	return newEditorWithDefaults(filePath, windowNum, false, "")
+}
+
+// NewEditorFreeForm creates an editor initialised in free-form (F90+) mode.
+func NewEditorFreeForm(filePath string, windowNum int) *Editor {
+	return newEditorWithDefaults(filePath, windowNum, true, "")
+}
+
+// NewEditorWithTitle creates an editor whose blank template shows the given title.
+func NewEditorWithTitle(filePath string, windowNum int, freeForm bool, title string) *Editor {
+	return newEditorWithDefaults(filePath, windowNum, freeForm, title)
+}
+
+func newEditorWithDefaults(filePath string, windowNum int, freeFormDefault bool, title string) *Editor {
+	defaultFileName := "NONAME00.FOR"
+	if freeFormDefault {
+		defaultFileName = "NONAME00.F90"
+	}
+
 	ed := &Editor{
 		Lines:             []string{""},
 		CursorX:           0,
 		CursorY:           0,
 		FilePath:          filePath,
-		FileName:          "NONAME00.FOR",
+		FileName:          defaultFileName,
 		ShowLineNums:      false,
-		ShowColumnGuides:  true,
+		ShowColumnGuides:  !freeFormDefault,
+		IsFreeForm:        freeFormDefault,
 		WindowNumber:      windowNum,
 		TabWidth:          4,
 		Breakpoints:       make(map[int]bool),
@@ -113,21 +180,19 @@ func NewEditor(filePath string, windowNum int) *Editor {
 	}
 
 	if filePath != "" {
-		ed.LoadFile(filePath)
+		_ = ed.LoadFile(filePath)
 	} else {
-		// Sample starter retro template for FORTRAN 77
-		ed.Lines = []string{
-			"C =======================================================",
-			"C  Turbo F77 - Turbo FORTRAN 77 IDE",
-			"C  Open Watcom 2.0 FORTRAN 77 Toolchain",
-			"C =======================================================",
-			"      PROGRAM HELLO",
-			"      PRINT *, '**************************************'",
-			"      PRINT *, '*      HELLO, TURBO FORTRAN 77!      *'",
-			"      PRINT *, '*   Powered by Open Watcom 2.0 F77   *'",
-			"      PRINT *, '**************************************'",
-			"      STOP",
-			"      END",
+		if title == "" {
+			if freeFormDefault {
+				title = "Turbo Fortran (F90+) - Modern Fortran IDE"
+			} else {
+				title = "Turbo F77 - Turbo FORTRAN 77 IDE"
+			}
+		}
+		if freeFormDefault {
+			ed.Lines = defaultF90Template(title)
+		} else {
+			ed.Lines = defaultF77Template(title)
 		}
 	}
 	return ed
@@ -192,6 +257,7 @@ func (e *Editor) LoadFile(path string) error {
 	e.ScrollX = 0
 	e.ScrollY = 0
 	e.CurrentIP = 0
+	e.updateModeFromFilename(e.FileName)
 
 	// 2. Restore or init breakpoints for the new file
 	if e.FileBreakpoints == nil {
@@ -270,6 +336,7 @@ func (e *Editor) SaveFile() error {
 func (e *Editor) SaveAs(path string) error {
 	e.FilePath = path
 	e.FileName = filepath.Base(path)
+	e.updateModeFromFilename(e.FileName)
 	return e.SaveFile()
 }
 
@@ -848,7 +915,7 @@ func (e *Editor) Draw(screen tcell.Screen, x, y, width, height int, focused bool
 
 		if lineIdx < len(e.Lines) {
 			lineText := e.Lines[lineIdx]
-			tokens := syntax.HighlightLine(lineText, baseStyle, &inComment)
+			tokens := syntax.HighlightLine(lineText, baseStyle, &inComment, e.IsFreeForm)
 
 			lineNo := lineIdx + 1
 			hasBP := e.Breakpoints != nil && e.Breakpoints[lineNo]

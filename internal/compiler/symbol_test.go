@@ -157,3 +157,49 @@ func TestFindDefinitionFortranEdgeCases(t *testing.T) {
 		t.Errorf("expected empty search matches for empty query")
 	}
 }
+
+func TestFindDefinitionModernFortran(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "tf_test_modern_*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	modFile := filepath.Join(tempDir, "matrix_mod.f90")
+	code := `! Modern Fortran Module
+module matrix_ops
+    implicit none
+    type matrix_t
+        real, allocatable :: data(:,:)
+    end type matrix_t
+contains
+    subroutine init_matrix(m, rows, cols)
+        type(matrix_t), intent(out) :: m
+        integer, intent(in) :: rows, cols
+        allocate(m%data(rows, cols))
+    end subroutine init_matrix
+end module matrix_ops
+`
+	if err := os.WriteFile(modFile, []byte(code), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Find MODULE definition
+	f, line, _, ok := FindDefinitionInProject(modFile, "matrix_ops")
+	if !ok || line != 2 {
+		t.Errorf("expected matrix_ops module at line 2, got %s:%d (ok=%v)", f, line, ok)
+	}
+
+	// 2. Find TYPE definition
+	f, line, _, ok = FindDefinitionInProject(modFile, "matrix_t")
+	if !ok || line != 4 {
+		t.Errorf("expected matrix_t type at line 4, got %s:%d (ok=%v)", f, line, ok)
+	}
+
+	// 3. Find Subroutine inside module
+	f, line, _, ok = FindDefinitionInProject(modFile, "init_matrix")
+	if !ok || line != 8 {
+		t.Errorf("expected init_matrix subroutine at line 8, got %s:%d (ok=%v)", f, line, ok)
+	}
+}
+

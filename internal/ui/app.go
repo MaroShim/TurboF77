@@ -44,6 +44,11 @@ type App struct {
 }
 
 func NewApp(initialFile string) (*App, error) {
+	return NewAppWithConfig(initialFile, false)
+}
+
+// NewAppWithConfig creates an App with explicit free-form mode control.
+func NewAppWithConfig(initialFile string, freeFormDefault bool) (*App, error) {
 	s, err := tcell.NewScreen()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tcell screen: %w", err)
@@ -66,7 +71,7 @@ func NewApp(initialFile string) (*App, error) {
 		menuBar:     NewMenuBar(),
 		statusBar:   NewStatusBar(),
 		userScreen:  NewUserScreen(),
-		editor:      NewEditor(initialFile, 1),
+		editor:      newEditorWithDefaults(initialFile, 1, freeFormDefault, ""),
 		debugger:    debugger.NewDebugger(),
 		watchWindow: NewWatchWindow(2),
 	}

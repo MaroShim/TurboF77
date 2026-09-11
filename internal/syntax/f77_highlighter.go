@@ -19,7 +19,8 @@ var (
 	ColorSyntaxNormal   = tcell.ColorWhite
 )
 
-var f77Keywords = map[string]bool{
+var fortranKeywords = map[string]bool{
+	// Fortran 77
 	"program": true, "subroutine": true, "function": true, "block": true, "data": true,
 	"entry": true, "common": true, "dimension": true, "equivalence": true, "parameter": true,
 	"implicit": true, "save": true, "intrinsic": true, "external": true,
@@ -28,14 +29,31 @@ var f77Keywords = map[string]bool{
 	"call": true, "return": true, "stop": true, "pause": true, "end": true,
 	"read": true, "write": true, "print": true, "open": true, "close": true,
 	"inquire": true, "backspace": true, "endfile": true, "rewind": true, "format": true,
+
+	// Modern Fortran (F90 / F95 / F2003 / F2008)
+	"module": true, "use": true, "contains": true, "only": true,
+	"select": true, "case": true, "default": true, "cycle": true, "exit": true,
+	"where": true, "elsewhere": true, "endwhere": true, "forall": true, "endforall": true,
+	"type": true, "endtype": true, "intent": true, "in": true, "out": true, "inout": true,
+	"allocatable": true, "allocate": true, "deallocate": true,
+	"pointer": true, "target": true, "nullify": true,
+	"optional": true, "public": true, "private": true,
+	"interface": true, "endinterface": true, "procedure": true, "generic": true,
+	"operator": true, "assignment": true,
+	"recursive": true, "pure": true, "elemental": true, "result": true,
+	"namelist": true, "sequence": true, "abstract": true, "extends": true, "class": true,
+	"asynchronous": true, "bind": true, "import": true, "associate": true,
+	"critical": true, "error": true,
 }
 
-var f77Types = map[string]bool{
-	"integer": true, "real": true, "double": true, "precision": true,
+var fortranTypes = map[string]bool{
+	"integer": true, "real": true, "double": true, "precision": true, "doubleprecision": true,
 	"complex": true, "logical": true, "character": true,
+	"kind": true, "len": true, "byte": true,
 }
 
-var f77Intrinsics = map[string]bool{
+var fortranIntrinsics = map[string]bool{
+	// F77 Math & General
 	"abs": true, "acos": true, "aimag": true, "aint": true, "alog": true, "alog10": true,
 	"amax0": true, "amax1": true, "amin0": true, "amin1": true, "amod": true, "anint": true,
 	"asin": true, "atan": true, "atan2": true, "cabs": true, "ccos": true, "char": true,
@@ -50,9 +68,24 @@ var f77Intrinsics = map[string]bool{
 	"max0": true, "max1": true, "min": true, "min0": true, "min1": true, "mod": true,
 	"nint": true, "sign": true, "sin": true, "sinh": true, "sngl": true, "sqrt": true,
 	"tan": true, "tanh": true,
+
+	// F90+ Array, String, System intrinsics
+	"sum": true, "product": true, "matmul": true, "dot_product": true,
+	"transpose": true, "reshape": true, "size": true, "shape": true,
+	"lbound": true, "ubound": true, "pack": true, "unpack": true, "merge": true,
+	"all": true, "any": true, "count": true, "maxval": true, "minval": true,
+	"maxloc": true, "minloc": true, "cshift": true, "eoshift": true, "spread": true,
+	"trim": true, "adjustl": true, "adjustr": true, "associated": true,
+	"present": true, "allocated": true, "null": true,
+	"iand": true, "ior": true, "ieor": true, "not": true, "ishft": true,
+	"btest": true, "ibset": true, "ibclr": true, "scan": true, "verify": true, "repeat": true,
+	"selected_real_kind": true, "selected_int_kind": true,
+	"huge": true, "tiny": true, "epsilon": true,
+	"cpu_time": true, "system_clock": true, "date_and_time": true,
+	"random_number": true, "random_seed": true,
 }
 
-var f77Operators = map[string]bool{
+var fortranOperators = map[string]bool{
 	".true.": true, ".false.": true,
 	".and.": true, ".or.": true, ".not.": true, ".eqv.": true, ".neqv.": true,
 	".eq.": true, ".ne.": true, ".lt.": true, ".le.": true, ".gt.": true, ".ge.": true,
@@ -64,8 +97,10 @@ type Token struct {
 	Char  rune
 }
 
-// HighlightLine parses a line of FORTRAN 77 code and returns styled tokens
-func HighlightLine(line string, baseStyle tcell.Style, inBlockComment *bool) []Token {
+// HighlightLine parses a line of Fortran code and returns styled tokens.
+// Optional isFreeForm flag specifies whether to use Free-Form (F90+) or Fixed-Form (F77) syntax rules.
+func HighlightLine(line string, baseStyle tcell.Style, inBlockComment *bool, isFreeForm ...bool) []Token {
+	freeForm := len(isFreeForm) > 0 && isFreeForm[0]
 	runes := []rune(line)
 	n := len(runes)
 	tokens := make([]Token, n)
@@ -84,47 +119,49 @@ func HighlightLine(line string, baseStyle tcell.Style, inBlockComment *bool) []T
 		return tokens
 	}
 
-	// 1. FORTRAN 77 Fixed-format comment: Column 1 is 'C', 'c', '*', or '!'
-	firstChar := runes[0]
-	if firstChar == 'C' || firstChar == 'c' || firstChar == '*' || firstChar == '!' {
-		for i := 0; i < n; i++ {
-			tokens[i] = Token{Style: commentStyle, Char: runes[i]}
-		}
-		return tokens
-	}
-
 	i := 0
 
-	// 2. Statement Label (Columns 1-5, 0-indexed 0 to 4)
-	if i < 5 && i < n {
-		for i < 5 && i < n {
-			if unicode.IsDigit(runes[i]) {
-				tokens[i] = Token{Style: labelStyle, Char: runes[i]}
-				i++
-			} else if runes[i] == '!' {
-				for i < n {
-					tokens[i] = Token{Style: commentStyle, Char: runes[i]}
+	if !freeForm {
+		// 1. FORTRAN 77 Fixed-format comment: Column 1 is 'C', 'c', '*', or '!'
+		firstChar := runes[0]
+		if firstChar == 'C' || firstChar == 'c' || firstChar == '*' || firstChar == '!' {
+			for idx := 0; idx < n; idx++ {
+				tokens[idx] = Token{Style: commentStyle, Char: runes[idx]}
+			}
+			return tokens
+		}
+
+		// 2. Statement Label (Columns 1-5, 0-indexed 0 to 4)
+		if i < 5 && i < n {
+			for i < 5 && i < n {
+				if unicode.IsDigit(runes[i]) {
+					tokens[i] = Token{Style: labelStyle, Char: runes[i]}
+					i++
+				} else if runes[i] == '!' {
+					for i < n {
+						tokens[i] = Token{Style: commentStyle, Char: runes[i]}
+						i++
+					}
+					return tokens
+				} else {
+					tokens[i] = Token{Style: baseStyle, Char: runes[i]}
 					i++
 				}
-				return tokens
-			} else {
-				tokens[i] = Token{Style: baseStyle, Char: runes[i]}
-				i++
 			}
 		}
-	}
 
-	// 3. Continuation character (Column 6, 0-indexed 5)
-	if i == 5 && i < n {
-		if runes[i] != ' ' && runes[i] != '0' && runes[i] != '\t' {
-			tokens[i] = Token{Style: contStyle, Char: runes[i]}
-		} else {
-			tokens[i] = Token{Style: baseStyle, Char: runes[i]}
+		// 3. Continuation character (Column 6, 0-indexed 5)
+		if i == 5 && i < n {
+			if runes[i] != ' ' && runes[i] != '0' && runes[i] != '\t' {
+				tokens[i] = Token{Style: contStyle, Char: runes[i]}
+			} else {
+				tokens[i] = Token{Style: baseStyle, Char: runes[i]}
+			}
+			i++
 		}
-		i++
 	}
 
-	// 4. Main statement and columns >= 7
+	// Main statement scanning loop (Free-form from col 0, Fixed-form from col 6/7+)
 	for i < n {
 		r := runes[i]
 
@@ -158,7 +195,7 @@ func HighlightLine(line string, baseStyle tcell.Style, inBlockComment *bool) []T
 			continue
 		}
 
-		// Double quoted string (common compiler extension)
+		// Double quoted string
 		if r == '"' {
 			tokens[i] = Token{Style: stringStyle, Char: r}
 			i++
@@ -174,6 +211,17 @@ func HighlightLine(line string, baseStyle tcell.Style, inBlockComment *bool) []T
 			continue
 		}
 
+		// Modern relational / pointer / type member operators (==, /=, <=, >=, =>, %, ::)
+		if i+1 < n {
+			twoChars := string(runes[i : i+2])
+			if twoChars == "==" || twoChars == "/=" || twoChars == "<=" || twoChars == ">=" || twoChars == "=>" || twoChars == "::" {
+				tokens[i] = Token{Style: opStyle, Char: runes[i]}
+				tokens[i+1] = Token{Style: opStyle, Char: runes[i+1]}
+				i += 2
+				continue
+			}
+		}
+
 		// Dotted operators and logical constants: .TRUE., .EQ., etc.
 		if r == '.' && i+1 < n && unicode.IsLetter(runes[i+1]) {
 			start := i
@@ -184,7 +232,7 @@ func HighlightLine(line string, baseStyle tcell.Style, inBlockComment *bool) []T
 			if i < n && runes[i] == '.' {
 				i++
 				dotWord := strings.ToLower(string(runes[start:i]))
-				if f77Operators[dotWord] {
+				if fortranOperators[dotWord] {
 					for j := start; j < i; j++ {
 						tokens[j] = Token{Style: opStyle, Char: runes[j]}
 					}
@@ -228,11 +276,11 @@ func HighlightLine(line string, baseStyle tcell.Style, inBlockComment *bool) []T
 			word := strings.ToLower(string(runes[start:i]))
 
 			var style tcell.Style
-			if f77Keywords[word] {
+			if fortranKeywords[word] {
 				style = keywordStyle
-			} else if f77Types[word] {
+			} else if fortranTypes[word] {
 				style = typeStyle
-			} else if f77Intrinsics[word] {
+			} else if fortranIntrinsics[word] {
 				style = builtinStyle
 			} else {
 				style = baseStyle
@@ -244,7 +292,14 @@ func HighlightLine(line string, baseStyle tcell.Style, inBlockComment *bool) []T
 			continue
 		}
 
-		// Default punctuation / operators
+		// Single character operators
+		if r == '%' || r == '&' || r == '<' || r == '>' || r == '=' || r == '+' || r == '-' || r == '*' || r == '/' {
+			tokens[i] = Token{Style: opStyle, Char: r}
+			i++
+			continue
+		}
+
+		// Default punctuation
 		tokens[i] = Token{Style: baseStyle, Char: r}
 		i++
 	}
