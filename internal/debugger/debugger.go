@@ -150,29 +150,64 @@ func (d *Debugger) StartSession(srcFile string, extra ...string) error {
 
 	d.srcFile = srcFile
 
-	// 1. If binary executable is compiled and native debugger is available, prefer native backend
-	if binPath != "" {
-		if fi, err := os.Stat(binPath); err == nil && !fi.IsDir() {
-			dbgTool, hasDbgTool := compiler.FindDebuggerTool(compilerKind)
-			if hasDbgTool && (dbgTool.Kind == "lldb" || dbgTool.Kind == "gdb") {
-				nativeBackend := NewGdbLldbBackend(dbgTool)
-				if err := nativeBackend.Start(srcFile, binPath, d.breakpoints); err == nil {
-					d.backend = nativeBackend
-					d.backendType = BackendGdbLldb
-					d.state = nativeBackend.GetState()
-					return nil
-				}
-			}
+	// Check if this project requires multi-file execution
+	companions := compiler.FindCompanionFiles(srcFile)
+	isMultiFile := len(companions) > 0
+
+	// Helper to start native backend
+	startNative := func() error {
+		if binPath == "" {
+			return fmt.Errorf("no binary compiled for native debug")
 		}
+		if fi, err := os.Stat(binPath); err != nil || fi.IsDir() {
+			return fmt.Errorf("binary executable does not exist: %s", binPath)
+		}
+		dbgTool, hasDbgTool := compiler.FindDebuggerTool(compilerKind)
+		if !hasDbgTool || (dbgTool.Kind != "lldb" && dbgTool.Kind != "gdb") {
+			return fmt.Errorf("no native debugger tool found")
+		}
+		nativeBackend := NewGdbLldbBackend(dbgTool)
+		if err := nativeBackend.Start(srcFile, binPath, d.breakpoints); err != nil {
+			return err
+		}
+		d.backend = nativeBackend
+		d.backendType = BackendGdbLldb
+		d.state = nativeBackend.GetState()
+		return nil
 	}
 
-	// 2. Built-in interpreter engine: Safe, instant, full variable tracking for single-file scripts
-	internalBackend := NewInternalBackend()
-	if err := internalBackend.Start(srcFile, binPath, d.breakpoints); err == nil {
+	// Helper to start internal interpreter backend
+	startInternal := func() error {
+		internalBackend := NewInternalBackend()
+		if err := internalBackend.Start(srcFile, binPath, d.breakpoints); err != nil {
+			return err
+		}
 		d.backend = internalBackend
 		d.backendType = BackendInternal
 		d.state = internalBackend.GetState()
 		return nil
+	}
+
+	// 1. If preferred engine is Native (GDB/LLDB) or if the project is multi-file (which requires compiler/native execution), try native first
+	if d.prefEngine == BackendGdbLldb || isMultiFile {
+		if err := startNative(); err == nil {
+			return nil
+		}
+		// If native failed but it's not multi-file, fall back to internal
+		if !isMultiFile {
+			if err := startInternal(); err == nil {
+				return nil
+			}
+		}
+	} else {
+		// 2. Default: prefEngine == BackendInternal (Safe, instant, 100% accurate variable inspection)
+		if err := startInternal(); err == nil {
+			return nil
+		}
+		// If internal failed, fall back to native if binary is available
+		if err := startNative(); err == nil {
+			return nil
+		}
 	}
 
 	return fmt.Errorf("failed to start debug engine (both internal and native failed)")

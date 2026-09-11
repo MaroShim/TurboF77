@@ -203,3 +203,59 @@ func TestDebugger_PreferredEngineSelection(t *testing.T) {
 		t.Errorf("expected toggled engine to be BackendInternal, got %v", newEng)
 	}
 }
+
+func TestDebugger_DefaultInternalEnginePriority(t *testing.T) {
+	cInfo, hasCompiler := compiler.FindFortranCompiler()
+	if !hasCompiler || cInfo.Kind != "gfortran" {
+		t.Skip("gfortran not available; skipping test")
+	}
+
+	tmpDir := t.TempDir()
+	srcFile := filepath.Join(tmpDir, "simple_vars.for")
+	content := `      PROGRAM SVAR
+      INTEGER A, B
+      A = 25
+      B = 17
+      STOP
+      END
+`
+	if err := os.WriteFile(srcFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	bRes := compiler.Build(srcFile)
+	if bRes == nil || !bRes.Success || bRes.BinaryPath == "" {
+		t.Skipf("build failed with gfortran: %v", bRes)
+	}
+
+	// 1. By default (prefEngine == BackendInternal), StartSession must choose BackendInternal
+	// even when a compiled binary exists, so variables are 100% visible and tracked!
+	dbg := NewDebugger()
+	if err := dbg.StartSession(srcFile, bRes.BinaryPath, cInfo.Kind); err != nil {
+		t.Fatalf("StartSession failed: %v", err)
+	}
+	defer dbg.Stop()
+
+	if dbg.GetBackendType() != BackendInternal {
+		t.Fatalf("expected default backend to be BackendInternal, got %s", dbg.GetBackendType())
+	}
+
+	// Step line by line and check variables
+	_ = dbg.Step() // executes A = 25
+	_ = dbg.Step() // executes B = 17
+
+	st := dbg.GetState()
+	vars := st.LocalVars
+	varMap := make(map[string]string)
+	for _, v := range vars {
+		varMap[v.Name] = v.Value
+	}
+
+	if varMap["A"] != "25" {
+		t.Errorf("expected A=25 in internal engine, got %q", varMap["A"])
+	}
+	if varMap["B"] != "17" {
+		t.Errorf("expected B=17 in internal engine, got %q", varMap["B"])
+	}
+}
+
