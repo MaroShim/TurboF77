@@ -103,6 +103,7 @@ func (b *GdbLldbBackend) Start(srcFile string, binPath string, bps map[int]bool)
 	} else {
 		_, _ = b.executeCommand("set pagination off")
 		_, _ = b.executeCommand("set confirm off")
+		_, _ = b.executeCommand("set target-async off")
 		_, _ = b.executeCommand("break MAIN__")
 		_, _ = b.executeCommand("break main")
 	}
