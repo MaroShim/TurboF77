@@ -84,3 +84,76 @@ func TestFindDefinitionInFortranProject(t *testing.T) {
 		t.Errorf("expected at least 2 matches for CALCSUM, got %d", len(matches))
 	}
 }
+
+func TestFindDefinitionFortranEdgeCases(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "tf77_test_edge_*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	file := filepath.Join(tempDir, "complex_prog.for")
+	code := `C Line 1 comment: SUBROUTINE FAKE_SUB()
+* Line 2 asterisk comment: FUNCTION FAKE_FUNC()
+! Line 3 exclamation comment: PROGRAM FAKE_PROG
+      DOUBLE PRECISION FUNCTION CALC_PI(RADIUS)
+      DOUBLE PRECISION RADIUS
+      CALC_PI = 3.1415926535D0 * RADIUS
+      RETURN
+      END
+
+      ENTRY SUB_ENTRY(X)
+      RETURN
+      END
+
+      BLOCK DATA INIT_VALUES
+      COMMON /BLK/ VAL1
+      DATA VAL1 /100/
+      END
+`
+	if err := os.WriteFile(file, []byte(code), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Comments with keywords must not be matched as definitions
+	_, _, _, ok := FindDefinitionInProject(file, "FAKE_SUB")
+	if ok {
+		t.Errorf("expected FAKE_SUB in 'C' comment to NOT be matched")
+	}
+	_, _, _, ok = FindDefinitionInProject(file, "FAKE_FUNC")
+	if ok {
+		t.Errorf("expected FAKE_FUNC in '*' comment to NOT be matched")
+	}
+	_, _, _, ok = FindDefinitionInProject(file, "FAKE_PROG")
+	if ok {
+		t.Errorf("expected FAKE_PROG in '!' comment to NOT be matched")
+	}
+
+	// 2. Multi-word type prefix: DOUBLE PRECISION FUNCTION
+	f, line, _, ok := FindDefinitionInProject(file, "calc_pi")
+	if !ok || line != 4 {
+		t.Errorf("expected calc_pi at line 4, got %s:%d (ok=%v)", f, line, ok)
+	}
+
+	// 3. ENTRY statement
+	_, line, _, ok = FindDefinitionInProject(file, "sub_entry")
+	if !ok || line != 10 {
+		t.Errorf("expected sub_entry at line 10, got line %d", line)
+	}
+
+	// 4. BLOCK DATA statement
+	_, line, _, ok = FindDefinitionInProject(file, "init_values")
+	if !ok || line != 14 {
+		t.Errorf("expected init_values at line 14, got line %d", line)
+	}
+
+	// 5. Blank query & empty searches
+	_, _, _, ok = FindDefinitionInProject(file, "   ")
+	if ok {
+		t.Errorf("expected blank query to return false")
+	}
+	matches := SearchInProject(file, "", false)
+	if len(matches) != 0 {
+		t.Errorf("expected empty search matches for empty query")
+	}
+}
