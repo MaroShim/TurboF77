@@ -45,9 +45,9 @@ func main() {
 		initialFile = os.Args[1]
 	}
 
-	app, err := ui.NewApp(initialFile)
+	app, err := ui.NewAppWithConfig(initialFile, true)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error initializing Turbo F77: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error initializing Turbo Fortran: %v\n", err)
 		os.Exit(1)
 	}
 	defer app.Stop()
