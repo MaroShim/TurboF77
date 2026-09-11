@@ -43,6 +43,22 @@ type App struct {
 	onAction func(actionID string)
 }
 
+func NewAppWithScreen(s tcell.Screen, initialFile string) *App {
+	w, h := s.Size()
+	return &App{
+		screen:      s,
+		running:     true,
+		width:       w,
+		height:      h,
+		menuBar:     NewMenuBar(),
+		statusBar:   NewStatusBar(),
+		userScreen:  NewUserScreen(),
+		editor:      newEditorWithDefaults(initialFile, 1, false, ""),
+		debugger:    debugger.NewDebugger(),
+		watchWindow: NewWatchWindow(2),
+	}
+}
+
 func NewApp(initialFile string) (*App, error) {
 	return NewAppWithConfig(initialFile, false)
 }
@@ -61,19 +77,9 @@ func NewAppWithConfig(initialFile string, freeFormDefault bool) (*App, error) {
 	s.EnableMouse()
 	s.Clear()
 
-	w, h := s.Size()
-
-	app := &App{
-		screen:      s,
-		running:     true,
-		width:       w,
-		height:      h,
-		menuBar:     NewMenuBar(),
-		statusBar:   NewStatusBar(),
-		userScreen:  NewUserScreen(),
-		editor:      newEditorWithDefaults(initialFile, 1, freeFormDefault, ""),
-		debugger:    debugger.NewDebugger(),
-		watchWindow: NewWatchWindow(2),
+	app := NewAppWithScreen(s, initialFile)
+	if freeFormDefault {
+		app.editor = newEditorWithDefaults(initialFile, 1, true, "")
 	}
 
 	return app, nil
@@ -189,11 +195,73 @@ func (a *App) Stop() {
 	a.screen.Fini()
 }
 
+func (a *App) ToggleBreakpoint(line int) bool {
+	isSet := a.editor.ToggleBreakpoint(line)
+	targetFile := a.editor.FilePath
+	if targetFile != "" {
+		absTarget, _ := filepath.Abs(targetFile)
+		if isSet {
+			a.debugger.SetBreakpoint(absTarget, line)
+		} else {
+			a.debugger.ToggleBreakpoint(absTarget, line)
+		}
+	}
+	return isSet
+}
+
 func (a *App) SyncDebuggerState() {
 	st := a.debugger.GetState()
 	a.watchWindow.SetState(st)
-	if st.CurrentLine > 0 && !st.Exited {
-		a.editor.SetCurrentIP(st.CurrentLine)
+	if st.CurrentLine > 0 && st.Active && !st.Exited {
+		targetFile := st.CurrentFile
+		fileLoaded := false
+		if targetFile != "" {
+			resolved := targetFile
+			if !filepath.IsAbs(resolved) {
+				// 1. Try base name in current editor file's directory
+				if a.editor.FilePath != "" {
+					baseCand := filepath.Join(filepath.Dir(a.editor.FilePath), filepath.Base(targetFile))
+					if _, err := os.Stat(baseCand); err == nil {
+						resolved = baseCand
+					}
+				}
+				// 2. Try relative to current editor file's directory
+				if !filepath.IsAbs(resolved) && a.editor.FilePath != "" {
+					cand := filepath.Join(filepath.Dir(a.editor.FilePath), targetFile)
+					if _, err := os.Stat(cand); err == nil {
+						resolved = cand
+					}
+				}
+				// 3. Try relative to current working directory
+				if !filepath.IsAbs(resolved) {
+					if cwd, err := os.Getwd(); err == nil {
+						cand := filepath.Join(cwd, targetFile)
+						if _, err := os.Stat(cand); err == nil {
+							resolved = cand
+						}
+					}
+				}
+			}
+			if absResolved, err := filepath.Abs(resolved); err == nil {
+				resolved = absResolved
+			}
+			if fi, err := os.Stat(resolved); err == nil && fi.Mode().IsRegular() {
+				cleanTarget := filepath.Clean(resolved)
+				cleanCurrent := filepath.Clean(a.editor.FilePath)
+				if absCur, err := filepath.Abs(cleanCurrent); err == nil {
+					cleanCurrent = absCur
+				}
+				if cleanTarget != cleanCurrent {
+					_ = a.editor.LoadFile(cleanTarget)
+				}
+				fileLoaded = true
+			} else if filepath.Base(a.editor.FilePath) == filepath.Base(targetFile) {
+				fileLoaded = true
+			}
+		}
+		if fileLoaded {
+			a.editor.SetCurrentIP(st.CurrentLine)
+		}
 	} else {
 		a.editor.SetCurrentIP(0)
 	}
@@ -241,9 +309,44 @@ func (a *App) StartDebugging() error {
 
 	absTarget, _ := filepath.Abs(targetFile)
 
-	// Register editor breakpoints into debugger
-	for l := range a.editor.Breakpoints {
-		a.debugger.ToggleBreakpoint(absTarget, l)
+	// 1. Sync current active editor file breakpoints into FileBreakpoints
+	if a.editor.FilePath != "" {
+		curKey := filepath.Clean(a.editor.FilePath)
+		if len(a.editor.Breakpoints) > 0 {
+			saved := make(map[int]bool)
+			for k, v := range a.editor.Breakpoints {
+				if v {
+					saved[k] = true
+				}
+			}
+			if a.editor.FileBreakpoints == nil {
+				a.editor.FileBreakpoints = make(map[string]map[int]bool)
+			}
+			a.editor.FileBreakpoints[curKey] = saved
+		} else if a.editor.FileBreakpoints != nil {
+			delete(a.editor.FileBreakpoints, curKey)
+		}
+	}
+
+	// 2. Clear and synchronize all editor breakpoints across ALL files into debugger
+	a.debugger.ClearBreakpoints()
+	if a.editor.FileBreakpoints != nil {
+		for f, lines := range a.editor.FileBreakpoints {
+			absF, err := filepath.Abs(f)
+			if err != nil {
+				absF = f
+			}
+			for l, set := range lines {
+				if set {
+					a.debugger.SetBreakpoint(absF, l)
+				}
+			}
+		}
+	}
+	for l, set := range a.editor.Breakpoints {
+		if set {
+			a.debugger.SetBreakpoint(absTarget, l)
+		}
 	}
 
 	// Attempt to build binary with debug symbols for native compiler backend

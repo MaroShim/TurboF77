@@ -89,6 +89,24 @@ func (d *Debugger) ToggleEngine() BackendType {
 	return d.prefEngine
 }
 
+func (d *Debugger) ClearBreakpoints() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.breakpoints = make(map[string]map[int]bool)
+}
+
+func (d *Debugger) SetBreakpoint(file string, line int) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.breakpoints[file] == nil {
+		d.breakpoints[file] = make(map[int]bool)
+	}
+	d.breakpoints[file][line] = true
+	if d.backend != nil {
+		_ = d.backend.SetBreakpoint(file, line, true)
+	}
+}
+
 func (d *Debugger) ToggleBreakpoint(file string, line int) bool {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -106,8 +124,8 @@ func (d *Debugger) ToggleBreakpoint(file string, line int) bool {
 		enabled = true
 	}
 
-	if d.backend != nil && file == d.srcFile {
-		_ = d.backend.SetBreakpoint(line, enabled)
+	if d.backend != nil {
+		_ = d.backend.SetBreakpoint(file, line, enabled)
 	}
 	return enabled
 }
@@ -130,26 +148,15 @@ func (d *Debugger) StartSession(srcFile string, extra ...string) error {
 		compilerKind = extra[1]
 	}
 
-	bps := make(map[int]bool)
-	if fileBps, ok := d.breakpoints[srcFile]; ok {
-		for l, set := range fileBps {
-			if set {
-				bps[l] = true
-			}
-		}
-	}
-
 	d.srcFile = srcFile
 
-	// Check user preferred engine
-	tryNativeFirst := (d.prefEngine == BackendGdbLldb)
-
-	if tryNativeFirst && binPath != "" {
+	// 1. If binary executable is compiled and native debugger is available, prefer native backend
+	if binPath != "" {
 		if fi, err := os.Stat(binPath); err == nil && !fi.IsDir() {
 			dbgTool, hasDbgTool := compiler.FindDebuggerTool(compilerKind)
 			if hasDbgTool && (dbgTool.Kind == "lldb" || dbgTool.Kind == "gdb") {
 				nativeBackend := NewGdbLldbBackend(dbgTool)
-				if err := nativeBackend.Start(srcFile, binPath, bps); err == nil {
+				if err := nativeBackend.Start(srcFile, binPath, d.breakpoints); err == nil {
 					d.backend = nativeBackend
 					d.backendType = BackendGdbLldb
 					d.state = nativeBackend.GetState()
@@ -159,29 +166,13 @@ func (d *Debugger) StartSession(srcFile string, extra ...string) error {
 		}
 	}
 
-	// Built-in interpreter engine (Default): Safe, instant, full variable tracking
+	// 2. Built-in interpreter engine: Safe, instant, full variable tracking for single-file scripts
 	internalBackend := NewInternalBackend()
-	if err := internalBackend.Start(srcFile, binPath, bps); err == nil {
+	if err := internalBackend.Start(srcFile, binPath, d.breakpoints); err == nil {
 		d.backend = internalBackend
 		d.backendType = BackendInternal
 		d.state = internalBackend.GetState()
 		return nil
-	}
-
-	// If internal engine cannot run (e.g. unsupported complex syntax) and native wasn't tried yet, fallback to native
-	if !tryNativeFirst && binPath != "" {
-		if fi, err := os.Stat(binPath); err == nil && !fi.IsDir() {
-			dbgTool, hasDbgTool := compiler.FindDebuggerTool(compilerKind)
-			if hasDbgTool && (dbgTool.Kind == "lldb" || dbgTool.Kind == "gdb") {
-				nativeBackend := NewGdbLldbBackend(dbgTool)
-				if err := nativeBackend.Start(srcFile, binPath, bps); err == nil {
-					d.backend = nativeBackend
-					d.backendType = BackendGdbLldb
-					d.state = nativeBackend.GetState()
-					return nil
-				}
-			}
-		}
 	}
 
 	return fmt.Errorf("failed to start debug engine (both internal and native failed)")

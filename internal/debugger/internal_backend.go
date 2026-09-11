@@ -3,6 +3,7 @@ package debugger
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 )
@@ -20,7 +21,7 @@ func NewInternalBackend() *InternalBackend {
 	return &InternalBackend{}
 }
 
-func (b *InternalBackend) Start(srcFile string, binPath string, bps map[int]bool) error {
+func (b *InternalBackend) Start(srcFile string, binPath string, allBreakpoints map[string]map[int]bool) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -31,9 +32,14 @@ func (b *InternalBackend) Start(srcFile string, binPath string, bps map[int]bool
 
 	rawLines := strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
 	engineBps := make(map[int]bool)
-	for l, set := range bps {
-		if set {
-			engineBps[l] = true
+	base := filepath.Base(srcFile)
+	for f, lines := range allBreakpoints {
+		if f == srcFile || filepath.Base(f) == base {
+			for l, set := range lines {
+				if set {
+					engineBps[l] = true
+				}
+			}
 		}
 	}
 
@@ -122,11 +128,11 @@ func (b *InternalBackend) GetState() DebugState {
 	return b.state
 }
 
-func (b *InternalBackend) SetBreakpoint(line int, enabled bool) error {
+func (b *InternalBackend) SetBreakpoint(file string, line int, enabled bool) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if b.engine != nil {
+	if b.engine != nil && (file == b.srcFile || filepath.Base(file) == filepath.Base(b.srcFile)) {
 		if enabled {
 			b.engine.Breakpoints[line] = true
 		} else {

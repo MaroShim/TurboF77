@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -45,7 +46,7 @@ func NewGdbLldbBackend(tool compiler.DebuggerInfo) *GdbLldbBackend {
 }
 
 // Start launches the binary under the debugger and stops at the entry or first breakpoint
-func (b *GdbLldbBackend) Start(srcFile string, binPath string, bps map[int]bool) error {
+func (b *GdbLldbBackend) Start(srcFile string, binPath string, allBreakpoints map[string]map[int]bool) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -90,32 +91,51 @@ func (b *GdbLldbBackend) Start(srcFile string, binPath string, bps map[int]bool)
 
 	go b.readOutputLoop()
 
+	hasAnyBP := false
+	for _, lines := range allBreakpoints {
+		for _, set := range lines {
+			if set {
+				hasAnyBP = true
+				break
+			}
+		}
+		if hasAnyBP {
+			break
+		}
+	}
+
 	// Initial configuration
 	if b.isLldb {
 		_, _ = b.executeCommand("settings set auto-confirm true")
 		_, _ = b.executeCommand("settings set stop-line-count-before 0")
 		_, _ = b.executeCommand("settings set stop-line-count-after 0")
+		_, _ = b.executeCommand("settings set target.process.thread.step-avoid-regexp ^(_gfortran_|libgfortran|__sigtramp|std::|__GI_)")
 		// Enable synchronous mode so commands wait for process state change before returning
 		_, _ = b.executeCommand("script lldb.debugger.SetAsync(False)")
-		// Break at entry routines in Fortran (gfortran uses MAIN__)
-		_, _ = b.executeCommand("breakpoint set -n MAIN__")
-		_, _ = b.executeCommand("breakpoint set -n main")
+		// If no user breakpoints are configured, break at the entry routine (MAIN__ in gfortran)
+		if !hasAnyBP {
+			_, _ = b.executeCommand("breakpoint set -n MAIN__")
+		}
 	} else {
 		_, _ = b.executeCommand("set pagination off")
 		_, _ = b.executeCommand("set confirm off")
 		_, _ = b.executeCommand("set target-async off")
-		_, _ = b.executeCommand("break MAIN__")
-		_, _ = b.executeCommand("break main")
+		_, _ = b.executeCommand("skip -rfu ^(_gfortran_|libgfortran)")
+		if !hasAnyBP {
+			_, _ = b.executeCommand("break MAIN__")
+		}
 	}
 
-	// Set initial user breakpoints
-	srcBase := filepath.Base(srcFile)
-	for l, set := range bps {
-		if set {
-			if b.isLldb {
-				_, _ = b.executeCommand(fmt.Sprintf("breakpoint set -f %s -l %d", srcBase, l))
-			} else {
-				_, _ = b.executeCommand(fmt.Sprintf("break %s:%d", srcBase, l))
+	// Set initial user breakpoints across all files
+	for f, lines := range allBreakpoints {
+		baseFile := filepath.Base(f)
+		for l, set := range lines {
+			if set {
+				if b.isLldb {
+					_, _ = b.executeCommand(fmt.Sprintf("breakpoint set -f %s -l %d", baseFile, l))
+				} else {
+					_, _ = b.executeCommand(fmt.Sprintf("break %s:%d", baseFile, l))
+				}
 			}
 		}
 	}
@@ -171,6 +191,50 @@ func (b *GdbLldbBackend) Continue() error {
 	return nil
 }
 
+// isUserFile checks if the given file path represents user project source code
+func (b *GdbLldbBackend) isUserFile(file string) bool {
+	if file == "" {
+		return false
+	}
+	if strings.Contains(file, "libgfortran") ||
+		strings.Contains(file, "gcc") ||
+		strings.Contains(file, "/usr/") ||
+		strings.Contains(file, "libsystem") ||
+		strings.HasPrefix(file, "<") {
+		return false
+	}
+	srcDir := ""
+	if b.srcFile != "" {
+		srcDir = filepath.Dir(b.srcFile)
+	}
+	if filepath.IsAbs(file) {
+		if fi, err := os.Stat(file); err == nil && fi.Mode().IsRegular() {
+			if srcDir != "" && strings.HasPrefix(file, srcDir) {
+				return true
+			}
+			if cwd, err := os.Getwd(); err == nil && strings.HasPrefix(file, cwd) {
+				return true
+			}
+		}
+		return false
+	}
+	// Relative or base filename
+	if srcDir != "" {
+		if fi, err := os.Stat(filepath.Join(srcDir, file)); err == nil && fi.Mode().IsRegular() {
+			return true
+		}
+		if fi, err := os.Stat(filepath.Join(srcDir, filepath.Base(file))); err == nil && fi.Mode().IsRegular() {
+			return true
+		}
+	}
+	if cwd, err := os.Getwd(); err == nil {
+		if fi, err := os.Stat(filepath.Join(cwd, file)); err == nil && fi.Mode().IsRegular() {
+			return true
+		}
+	}
+	return false
+}
+
 // StepOver executes the current line, stepping over function calls
 func (b *GdbLldbBackend) StepOver() error {
 	b.mu.Lock()
@@ -193,6 +257,22 @@ func (b *GdbLldbBackend) StepOver() error {
 	}
 
 	b.parseCurrentLocation(out)
+
+	// Just My Code: If step-over landed in runtime/external libraries, step out back to user code
+	for !b.isUserFile(b.state.CurrentFile) && !b.state.Exited && b.state.Active {
+		var stepOutCmd string
+		if b.isLldb {
+			stepOutCmd = "thread step-out"
+		} else {
+			stepOutCmd = "finish"
+		}
+		outLines, err := b.executeCommand(stepOutCmd)
+		if err != nil {
+			break
+		}
+		b.parseCurrentLocation(outLines)
+	}
+
 	if !b.state.Exited {
 		b.queryVariables()
 	}
@@ -221,6 +301,22 @@ func (b *GdbLldbBackend) StepInto() error {
 	}
 
 	b.parseCurrentLocation(out)
+
+	// Just My Code: If step entered runtime/external libraries, step out back to user code
+	for !b.isUserFile(b.state.CurrentFile) && !b.state.Exited && b.state.Active {
+		var stepOutCmd string
+		if b.isLldb {
+			stepOutCmd = "thread step-out"
+		} else {
+			stepOutCmd = "finish"
+		}
+		outLines, err := b.executeCommand(stepOutCmd)
+		if err != nil {
+			break
+		}
+		b.parseCurrentLocation(outLines)
+	}
+
 	if !b.state.Exited {
 		b.queryVariables()
 	}
@@ -244,7 +340,7 @@ func (b *GdbLldbBackend) GetState() DebugState {
 }
 
 // SetBreakpoint adds or removes a breakpoint
-func (b *GdbLldbBackend) SetBreakpoint(line int, enabled bool) error {
+func (b *GdbLldbBackend) SetBreakpoint(file string, line int, enabled bool) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -252,7 +348,11 @@ func (b *GdbLldbBackend) SetBreakpoint(line int, enabled bool) error {
 		return nil
 	}
 
-	srcBase := filepath.Base(b.srcFile)
+	targetFile := file
+	if targetFile == "" {
+		targetFile = b.srcFile
+	}
+	srcBase := filepath.Base(targetFile)
 	var cmdStr string
 	if b.isLldb {
 		if enabled {

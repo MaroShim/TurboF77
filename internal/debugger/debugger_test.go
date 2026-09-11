@@ -157,7 +157,7 @@ func TestDebugger_GdbLldbBackend(t *testing.T) {
 
 	t0 := time.Now()
 	backend := NewGdbLldbBackend(dbgTool)
-	err := backend.Start(srcFile, bRes.BinaryPath, map[int]bool{4: true})
+	err := backend.Start(srcFile, bRes.BinaryPath, map[string]map[int]bool{srcFile: {4: true}})
 	t.Logf("Start() took: %v", time.Since(t0))
 	if err != nil {
 		// In restricted environments (like seatbelt sandbox), attach may fail
