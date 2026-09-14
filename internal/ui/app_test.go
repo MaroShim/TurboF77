@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/gdamore/tcell/v2"
+	"tf77/internal/debugger"
 )
 
 func TestAppMultiFileDebugging(t *testing.T) {
@@ -22,6 +23,7 @@ func TestAppMultiFileDebugging(t *testing.T) {
 	simScreen.SetSize(80, 25)
 
 	app := NewAppWithScreen(simScreen, modularMain)
+	app.GetDebugger().SetPreferredEngine(debugger.BackendGdbLldb)
 	defer app.StopDebugging()
 
 	// 1. Set a breakpoint in math_sub.for:6 (CALCSUM = X + Y)
@@ -104,6 +106,7 @@ func TestAppF7StepIntoSubroutines(t *testing.T) {
 	simScreen.SetSize(80, 25)
 
 	app := NewAppWithScreen(simScreen, modularMain)
+	app.GetDebugger().SetPreferredEngine(debugger.BackendGdbLldb)
 	defer app.StopDebugging()
 
 	// Set a breakpoint on line 8 of main.for (SUM = CALCSUM(A, B))

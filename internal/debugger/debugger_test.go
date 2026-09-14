@@ -259,3 +259,60 @@ func TestDebugger_DefaultInternalEnginePriority(t *testing.T) {
 	}
 }
 
+func TestModularExampleDebugging(t *testing.T) {
+	mainFile := "../../examples/modular/main.for"
+	if _, err := os.Stat(mainFile); err != nil {
+		t.Fatalf("modular main.for not found: %v", err)
+	}
+
+	dbg := NewDebugger()
+	dbg.SetPreferredEngine(BackendInternal)
+
+	if err := dbg.StartSession(mainFile); err != nil {
+		t.Fatalf("StartSession on modular main.for failed: %v", err)
+	}
+	defer dbg.Stop()
+
+	st := dbg.GetState()
+	t.Logf("Initial state: Line=%d File=%s Func=%s", st.CurrentLine, st.CurrentFile, st.CurrentFunc)
+	for _, v := range st.LocalVars {
+		t.Logf("  Init Var: %s (%s) = %s", v.Name, v.Type, v.Value)
+	}
+
+	// Step line 6: A = 25
+	if err := dbg.Step(); err != nil {
+		t.Fatalf("Step line 6 failed: %v", err)
+	}
+	// Step line 7: B = 17
+	if err := dbg.Step(); err != nil {
+		t.Fatalf("Step line 7 failed: %v", err)
+	}
+
+	st = dbg.GetState()
+	t.Logf("After A=25, B=17: Line=%d", st.CurrentLine)
+	varMap := make(map[string]string)
+	for _, v := range st.LocalVars {
+		t.Logf("  Var: %s (%s) = %s", v.Name, v.Type, v.Value)
+		varMap[v.Name] = v.Value
+	}
+
+	if varMap["A"] != "25" {
+		t.Errorf("expected A=25, got %q", varMap["A"])
+	}
+	if varMap["B"] != "17" {
+		t.Errorf("expected B=17, got %q", varMap["B"])
+	}
+
+	// Step line 8: SUM = CALCSUM(A, B)
+	_ = dbg.Step()
+	st = dbg.GetState()
+	t.Logf("After line 8 (SUM = CALCSUM): Line=%d", st.CurrentLine)
+	for _, v := range st.LocalVars {
+		t.Logf("  Var: %s (%s) = %s", v.Name, v.Type, v.Value)
+	}
+
+	// Step line 9: CALL PRINTSUM(A, B, SUM)
+	_ = dbg.Step()
+	st = dbg.GetState()
+	t.Logf("After line 9 (CALL PRINTSUM): Line=%d Exited=%v Output=%q", st.CurrentLine, st.Exited, st.Output)
+}

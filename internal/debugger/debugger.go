@@ -150,10 +150,6 @@ func (d *Debugger) StartSession(srcFile string, extra ...string) error {
 
 	d.srcFile = srcFile
 
-	// Check if this project requires multi-file execution
-	companions := compiler.FindCompanionFiles(srcFile)
-	isMultiFile := len(companions) > 0
-
 	// Helper to start native backend
 	startNative := func() error {
 		if binPath == "" {
@@ -188,8 +184,8 @@ func (d *Debugger) StartSession(srcFile string, extra ...string) error {
 		return nil
 	}
 
-	// 1. If preferred engine is Native (GDB/LLDB) or if the project is multi-file (which requires compiler/native execution), try native first
-	if d.prefEngine == BackendGdbLldb || isMultiFile {
+	// 1. If user explicitly selected Native engine (LLDB/GDB), try native first
+	if d.prefEngine == BackendGdbLldb {
 		if err := startNative(); err == nil {
 			return nil
 		}
@@ -198,7 +194,8 @@ func (d *Debugger) StartSession(srcFile string, extra ...string) error {
 			return nil
 		}
 	} else {
-		// 2. Default: prefEngine == BackendInternal (Safe, instant, 100% accurate variable inspection)
+		// 2. Default: prefEngine == BackendInternal
+		// Safe, instant, and provides 100% accurate variable inspection in Watches window!
 		if err := startInternal(); err == nil {
 			return nil
 		}
