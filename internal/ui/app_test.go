@@ -277,3 +277,31 @@ func TestWatchWindow_EngineNoticeRendering(t *testing.T) {
 		t.Errorf("expected rendered watch window to contain 'macOS LLDB', but got: %s", rendered)
 	}
 }
+
+type mockModalDialog struct {
+	visible bool
+}
+
+func (m *mockModalDialog) Draw(s tcell.Screen, w, h int) {}
+func (m *mockModalDialog) IsVisible() bool { return m.visible }
+
+func TestConfirmSaveDialogModalVisibility(t *testing.T) {
+	s := tcell.NewSimulationScreen("")
+	if err := s.Init(); err != nil {
+		t.Fatal(err)
+	}
+	defer s.Fini()
+
+	app := NewAppWithScreen(s, "")
+	mockDlg := &mockModalDialog{visible: false}
+	app.SetConfirmSaveDialog(mockDlg)
+
+	if app.HasModalVisible() {
+		t.Errorf("expected HasModalVisible to be false")
+	}
+
+	mockDlg.visible = true
+	if !app.HasModalVisible() {
+		t.Errorf("expected HasModalVisible to be true when confirmSaveDialog is visible")
+	}
+}
