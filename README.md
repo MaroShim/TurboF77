@@ -50,10 +50,10 @@ Both binaries **auto-switch mode** based on the file extension whenever you open
   * gfortran builds isolate `.mod` files in a temporary directory (`-J <tmpDir>`) to prevent workspace pollution
 
 * **Multi-Backend Interactive Debugger & Watches Window**:
-  * **Default Engine (Internal F77)**: Built-in pure-Go interpreter engine — zero external dependencies, sub-millisecond step execution, and 100% full real-time variable/array tracking in the Watches window.
-  * **Native Engine (LLDB / GDB)**: Subprocess backend for compiling and debugging native binaries via Apple LLDB (macOS) or GDB (Linux/Windows). Ideal for binary crash tracing and deep system inspection.
+  * **Default Engine (Internal F77)**: Built-in pure-Go interpreter engine for single-file routines (`hello.for`, `fibonacci.for`, `stats.for`) — zero external dependencies, sub-millisecond step execution, and 100% real-time variable/array inspection in the Watches window.
+  * **Native Engine (LLDB / GDB / Open Watcom)**: Subprocess backend for compiling and debugging native binaries. Automatically used for **multi-file projects** (e.g. `main.for` with companion files `io_sub.for`, `math_sub.for`), linking all routines and enabling seamless cross-file breakpoints, file auto-switching, and stepping.
   * **Engine Toggle**: Switch engines anytime via `Debug ➔ Engine: Internal (F77) / Native (LLDB/GDB)`.
-  * **Note on Apple LLDB (macOS)**: macOS's standard LLDB does not ship with a Fortran95 TypeSystem plugin (`frame variable` cannot decode Fortran types); the default **Internal** engine is recommended on macOS for full variable inspection in the Watches window. On Linux, GDB fully inspects Fortran variables natively.
+  * **Note on Apple LLDB (macOS) Watch Inspection**: Apple LLDB on macOS does not ship with a Fortran TypeSystem plugin (`frame variable` cannot decode Fortran types). When debugging multi-file projects via LLDB on macOS, cross-file breakpoints and stepping work seamlessly, but the Watches window and status bar will display an advisory note: `[Note: macOS LLDB has limited Fortran variable inspection support]`. On Linux/Windows, GDB inspects Fortran variables natively. For full variable inspection on macOS, single-file code runs via the built-in **Internal** engine.
   * **F4**: Toggle breakpoint (full-width red bar `●`)
   * **F5**: Start debugging / Continue to next breakpoint
   * **F7**: Trace Into, **F8**: Step Over, **Ctrl+F2**: Reset
@@ -231,10 +231,10 @@ If `$WATCOM` is set, Open Watcom takes priority over other compilers. Without it
   * gfortran 빌드 시 `.mod` 파일을 임시 디렉터리(`-J <tmpDir>`)에 격리하여 작업 폴더 오염 방지
 
 * **다중 백엔드 인터랙티브 디버거 & Watches Window**:
-  * **기본 엔진 (Internal F77)**: 내장 순수 Go 인터프리터 엔진 — 외부 툴 불필요, 0.001초 미만의 초고속 스텝 실행, 하단 Watches 창에서 포트란 변수명, 타입, 현재 값을 **100% 완벽하게 실시간 추적**.
-  * **네이티브 엔진 (LLDB / GDB)**: 실제 컴파일된 바이너리를 `lldb`(macOS) 또는 `gdb`(Linux/Windows) 자식 프로세스로 구동하는 백엔드. 네이티브 크래시 분석 및 머신 레벨 디버깅에 적합.
+  * **기본 엔진 (Internal F77)**: 단일 파일 실습 및 알고리즘용 내장 순수 Go 인터프리터 엔진 (`hello.for`, `fibonacci.for`, `stats.for`) — 외부 툴 불필요, 0.001초 미만의 초고속 스텝 실행, 하단 Watches 창에서 포트란 변수명, 타입, 현재 값을 **100% 완벽하게 실시간 추적**.
+  * **네이티브 엔진 (LLDB / GDB / Open Watcom)**: 실제 컴파일된 바이너리를 구동하는 서브프로세스 백엔드. 서브루틴/함수 파일이 분리된 **다중 파일 프로젝트**(`main.for` + `io_sub.for`, `math_sub.for`) 디버깅 시 자동 적용되어 전체 파일을 일괄 링크하고 파일 간 브레이크포인트, 에디터 파일 자동 전환 및 스텝 인투/오버 완벽 지원.
   * **디버거 엔진 즉시 전환**: 상단 메뉴 `Debug ➔ Engine: Internal (F77) / Native (LLDB/GDB)` 항목을 통해 언제든 자유롭게 전환 가능.
-  * **macOS Apple LLDB 안내**: macOS 기본 Apple LLDB에는 `fortran95` TypeSystem 플러그인이 포함되어 있지 않아 LLDB 자체적으로 포트란 변수 타입을 디코딩하지 못합니다. 따라서 macOS 환경에서 변수/배열 값 감시(Watches)가 필요할 때는 기본값인 **Internal** 엔진 사용을 권장합니다. (Linux 환경의 GDB는 포트란 변수를 네이티브로 완벽 지원합니다.)
+  * **macOS Apple LLDB 변수 감시 안내**: macOS의 기본 Apple LLDB에는 Fortran TypeSystem 플러그인이 포함되어 있지 않아 LLDB 자체적으로 포트란 로컬 변수 타입을 디코딩하지 못합니다 (`frame variable` 지원 한계). macOS에서 다중 파일 디버깅 시 브레이크포인트 및 스텝 이동은 정상 작동하나, Watches 창 및 상태 표시줄에 안내 메시지(`[Note: macOS LLDB has limited Fortran variable inspection support]`)가 표시됩니다. (Linux/Windows 환경의 GDB는 네이티브 포트란 변수 추적을 완벽 지원합니다.) 단일 파일의 완벽한 변수 감시가 필요할 경우 내장 **Internal** 엔진으로 실행됩니다.
   * **F4**: 브레이크포인트 설정/해제(`●`), **F5**: 디버깅 시작/계속, **F7**: Trace Into, **F8**: Step Over, **Ctrl+F2**: 리셋
   * 실행 중 현재 라인: 노란색 바(`►`) 강조
   * 하단 **Watches 윈도우**: 변수명, 타입, 값 실시간 감시

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/gdamore/tcell/v2"
@@ -175,5 +176,104 @@ func TestAppF7StepIntoSubroutines(t *testing.T) {
 		if filepath.Clean(app.editor.FilePath) != cleanIO {
 			t.Fatalf("step %d in io_sub.for leaked to %s (expected io_sub.for)", i, app.editor.FilePath)
 		}
+	}
+}
+
+func TestAppMultiFileDefaultEngineRoutingAndNotice(t *testing.T) {
+	modularMain, err := filepath.Abs("../../examples/modular/main.for")
+	if err != nil {
+		t.Fatalf("failed to resolve modular main path: %v", err)
+	}
+	modularIO := filepath.Join(filepath.Dir(modularMain), "io_sub.for")
+
+	simScreen := tcell.NewSimulationScreen("")
+	if err := simScreen.Init(); err != nil {
+		t.Fatalf("failed to init sim screen: %v", err)
+	}
+	simScreen.SetSize(80, 25)
+
+	// Keep default prefEngine (BackendInternal)
+	app := NewAppWithScreen(simScreen, modularMain)
+	defer app.StopDebugging()
+
+	if app.GetDebugger().GetPreferredEngine() != debugger.BackendInternal {
+		t.Fatalf("expected default engine to be BackendInternal, got %v", app.GetDebugger().GetPreferredEngine())
+	}
+
+	// 1. Set a breakpoint in companion file io_sub.for:7
+	if err := app.editor.LoadFile(modularIO); err != nil {
+		t.Fatalf("failed to load io_sub.for: %v", err)
+	}
+	app.ToggleBreakpoint(7)
+
+	// 2. Switch back to main.for and set breakpoint on line 8 (SUM = CALCSUM)
+	if err := app.editor.LoadFile(modularMain); err != nil {
+		t.Fatalf("failed to load main.for: %v", err)
+	}
+	app.ToggleBreakpoint(8)
+
+	// 3. Start debugging
+	if err := app.StartDebugging(); err != nil {
+		t.Fatalf("StartDebugging failed: %v", err)
+	}
+
+	// 4. Verify multi-file project automatically engaged native engine
+	if app.debugger.GetBackendType() != debugger.BackendGdbLldb {
+		t.Fatalf("expected BackendGdbLldb for multi-file project, got %s", app.debugger.GetBackendType())
+	}
+
+	st := app.debugger.GetState()
+	if st.EngineNotice != "" {
+		t.Logf("Observed EngineNotice: %s", st.EngineNotice)
+		if app.watchWindow.EngineNotice != st.EngineNotice {
+			t.Errorf("expected WatchWindow to receive EngineNotice %q, got %q", st.EngineNotice, app.watchWindow.EngineNotice)
+		}
+	}
+
+	// 5. Continue should hit breakpoint in companion file io_sub.for:7
+	if err := app.DebugContinue(); err != nil {
+		t.Fatalf("DebugContinue failed: %v", err)
+	}
+
+	cleanIO := filepath.Clean(modularIO)
+	if filepath.Clean(app.editor.FilePath) != cleanIO {
+		t.Fatalf("expected editor to switch to io_sub.for, but is at %s", app.editor.FilePath)
+	}
+	if app.editor.CurrentIP != 7 {
+		t.Fatalf("expected CurrentIP 7 in io_sub.for, got %d", app.editor.CurrentIP)
+	}
+}
+
+func TestWatchWindow_EngineNoticeRendering(t *testing.T) {
+	simScreen := tcell.NewSimulationScreen("")
+	if err := simScreen.Init(); err != nil {
+		t.Fatalf("failed to init sim screen: %v", err)
+	}
+	simScreen.SetSize(80, 25)
+
+	ww := NewWatchWindow(2)
+	ww.Visible = true
+	ww.SetState(debugger.DebugState{
+		Active:       true,
+		CurrentFile:  "main.for",
+		CurrentLine:  10,
+		CurrentFunc:  "MAIN",
+		EngineNotice: "Note: macOS LLDB has limited Fortran variable inspection support.",
+	})
+
+	ww.Draw(simScreen, 0, 15, 80, 8, true)
+	simScreen.Show()
+
+	// Check that the engine notice was rendered into the screen buffer
+	cells, _, _ := simScreen.GetContents()
+	var text strings.Builder
+	for _, cell := range cells {
+		if len(cell.Runes) > 0 {
+			text.WriteRune(cell.Runes[0])
+		}
+	}
+	rendered := text.String()
+	if !strings.Contains(rendered, "macOS LLDB") {
+		t.Errorf("expected rendered watch window to contain 'macOS LLDB', but got: %s", rendered)
 	}
 }

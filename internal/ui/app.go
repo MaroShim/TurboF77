@@ -367,6 +367,11 @@ func (a *App) StartDebugging() error {
 
 	a.watchWindow.Visible = true
 	a.SyncDebuggerState()
+
+	st := a.debugger.GetState()
+	if st.EngineNotice != "" {
+		a.SetStatusMessage(st.EngineNotice)
+	}
 	return nil
 }
 

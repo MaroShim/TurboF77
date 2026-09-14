@@ -3,6 +3,7 @@ package debugger
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"tf77/internal/compiler"
@@ -27,6 +28,8 @@ type DebugState struct {
 	LocalVars    []Variable
 	ErrorMessage string
 	Output       string
+	Backend      BackendType
+	EngineNotice string // Advisory hint (e.g. LLDB variable inspection notice on macOS)
 }
 
 // Debuger manages a debug session for FORTRAN 77 code
@@ -54,9 +57,22 @@ func (d *Debugger) IsActive() bool {
 	return d.state.Active && !d.state.Exited
 }
 
+func (d *Debugger) refreshStateLocked() {
+	if d.backend != nil {
+		notice := d.state.EngineNotice
+		st := d.backend.GetState()
+		st.Backend = d.backendType
+		if st.EngineNotice == "" {
+			st.EngineNotice = notice
+		}
+		d.state = st
+	}
+}
+
 func (d *Debugger) GetState() DebugState {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	d.refreshStateLocked()
 	return d.state
 }
 
@@ -150,6 +166,14 @@ func (d *Debugger) StartSession(srcFile string, extra ...string) error {
 
 	d.srcFile = srcFile
 
+	isMultiFile := len(compiler.FindCompanionFiles(srcFile)) > 0
+	if !isMultiFile && !compiler.HasProgramStatement(srcFile) {
+		dir := filepath.Dir(srcFile)
+		if mainProg := compiler.FindMainProgramFile(dir, srcFile); mainProg != "" {
+			isMultiFile = true
+		}
+	}
+
 	// Helper to start native backend
 	startNative := func() error {
 		if binPath == "" {
@@ -169,6 +193,10 @@ func (d *Debugger) StartSession(srcFile string, extra ...string) error {
 		d.backend = nativeBackend
 		d.backendType = BackendGdbLldb
 		d.state = nativeBackend.GetState()
+		d.state.Backend = BackendGdbLldb
+		if dbgTool.Kind == "lldb" {
+			d.state.EngineNotice = "Note: macOS LLDB has limited Fortran variable inspection support."
+		}
 		return nil
 	}
 
@@ -181,20 +209,24 @@ func (d *Debugger) StartSession(srcFile string, extra ...string) error {
 		d.backend = internalBackend
 		d.backendType = BackendInternal
 		d.state = internalBackend.GetState()
+		d.state.Backend = BackendInternal
 		return nil
 	}
 
-	// 1. If user explicitly selected Native engine (LLDB/GDB), try native first
-	if d.prefEngine == BackendGdbLldb {
+	// 1. If multi-file project or user explicitly selected Native engine (LLDB/GDB), try native first
+	if isMultiFile || d.prefEngine == BackendGdbLldb {
 		if err := startNative(); err == nil {
 			return nil
 		}
 		// If native failed, fall back to internal
 		if err := startInternal(); err == nil {
+			if isMultiFile {
+				d.state.EngineNotice = "Warning: Multi-file project running in single-file Internal engine (native debugger unavailable)."
+			}
 			return nil
 		}
 	} else {
-		// 2. Default: prefEngine == BackendInternal
+		// 2. Default: prefEngine == BackendInternal for single-file programs
 		// Safe, instant, and provides 100% accurate variable inspection in Watches window!
 		if err := startInternal(); err == nil {
 			return nil
@@ -218,7 +250,7 @@ func (d *Debugger) Continue() error {
 	}
 
 	err := d.backend.Continue()
-	d.state = d.backend.GetState()
+	d.refreshStateLocked()
 	return err
 }
 
@@ -232,7 +264,7 @@ func (d *Debugger) Step() error {
 	}
 
 	err := d.backend.StepInto()
-	d.state = d.backend.GetState()
+	d.refreshStateLocked()
 	return err
 }
 
@@ -246,7 +278,7 @@ func (d *Debugger) Next() error {
 	}
 
 	err := d.backend.StepOver()
-	d.state = d.backend.GetState()
+	d.refreshStateLocked()
 	return err
 }
 

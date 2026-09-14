@@ -16,6 +16,7 @@ type WatchWindow struct {
 	ScrollY      int
 	StatusText   string
 	WindowNumber int
+	EngineNotice string
 }
 
 func NewWatchWindow(winNum int) *WatchWindow {
@@ -28,6 +29,7 @@ func NewWatchWindow(winNum int) *WatchWindow {
 
 func (w *WatchWindow) SetState(st debugger.DebugState) {
 	w.Variables = st.LocalVars
+	w.EngineNotice = st.EngineNotice
 	if st.Exited {
 		w.StatusText = fmt.Sprintf("Process exited with code %d. [Debug finished]", st.ExitCode)
 	} else if st.CurrentFile != "" {
@@ -133,9 +135,14 @@ func (w *WatchWindow) Draw(screen tcell.Screen, x, y, width, height int, active 
 
 	if len(w.Variables) == 0 {
 		emptyMsg := "No watch expressions or local variables."
+		fgStyle := tcell.StyleDefault.Background(ColorEditorBg).Foreground(tcell.ColorDarkGray)
+		if w.EngineNotice != "" {
+			emptyMsg = w.EngineNotice
+			fgStyle = tcell.StyleDefault.Background(ColorEditorBg).Foreground(tcell.ColorYellow)
+		}
 		for i, r := range emptyMsg {
 			if x+2+i < x+width-1 {
-				screen.SetContent(x+2+i, varRowStart, r, nil, tcell.StyleDefault.Background(ColorEditorBg).Foreground(tcell.ColorDarkGray))
+				screen.SetContent(x+2+i, varRowStart, r, nil, fgStyle)
 			}
 		}
 		return
