@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"tf77/internal/compiler"
+	"github.com/MaroShim/tf77/internal/compiler"
 )
 
 func TestF77Engine(t *testing.T) {

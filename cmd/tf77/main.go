@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell/v2"
-	"tf77/internal/compiler"
-	"tf77/internal/debugger"
-	"tf77/internal/sound"
-	"tf77/internal/ui"
-	"tf77/internal/ui/dialogs"
+	"github.com/MaroShim/tf77/internal/compiler"
+	"github.com/MaroShim/tf77/internal/debugger"
+	"github.com/MaroShim/tf77/internal/sound"
+	"github.com/MaroShim/tf77/internal/ui"
+	"github.com/MaroShim/tf77/internal/ui/dialogs"
 )
 
 // matchMenuHotKey returns the menu index (0..8) for a given hotkey rune, or -1 if not matched.
@@ -864,6 +864,124 @@ func main() {
 
 			_, h := screen.Size()
 			editor.AdjustScroll(app.GetEditor().CursorX+1, h-4)
+
+		case *tcell.EventMouse:
+			mx, my := tev.Position()
+			btn := tev.Buttons()
+			screenW, screenH := screen.Size()
+
+			// 1. Dismiss UserScreen if active
+			if userScreen.Active {
+				if btn&tcell.Button1 != 0 {
+					userScreen.Hide()
+				}
+				continue
+			}
+
+			// 2. Modals handling (Rule 48: Strict Modal Focus Trapping)
+			if compileDlg.Visible {
+				if btn&tcell.Button1 != 0 {
+					compileDlg.Hide()
+					if compileDlg.Result != nil && len(compileDlg.Result.Errors) > 0 {
+						errListDlg.Show(compileDlg.Result.Errors, func(errItem compiler.CompileError) {
+							if errItem.File != "" && errItem.File != editor.FilePath {
+								if err := editor.LoadFile(errItem.File); err != nil {
+									sound.PlayError()
+									app.SetStatusMessage("Failed to open " + filepath.Base(errItem.File) + ": " + err.Error())
+									return
+								}
+							}
+							editor.GotoLine(errItem.Line, errItem.Column)
+						})
+					}
+				}
+				continue
+			}
+
+			if errListDlg.Visible {
+				errListDlg.HandleMouse(mx, my, btn, screenW, screenH)
+				continue
+			}
+
+			if openDlg.Visible {
+				openDlg.HandleMouse(mx, my, btn, screenW, screenH)
+				continue
+			}
+
+			if saveDlg.Visible {
+				saveDlg.HandleMouse(mx, my, btn, screenW, screenH)
+				continue
+			}
+
+			if aboutDlg.Visible {
+				aboutDlg.HandleMouse(mx, my, btn, screenW, screenH)
+				continue
+			}
+
+			if gotoDlg.Visible {
+				gotoDlg.HandleMouse(mx, my, btn, screenW, screenH)
+				continue
+			}
+
+			if findDlg.Visible {
+				findDlg.HandleMouse(mx, my, btn, screenW, screenH)
+				continue
+			}
+
+			if searchResDlg.Visible {
+				searchResDlg.HandleMouse(mx, my, btn, screenW, screenH)
+				continue
+			}
+
+			if confirmSaveDlg.Visible {
+				confirmSaveDlg.HandleMouse(mx, my, btn, screenW, screenH)
+				continue
+			}
+
+			// 3. Mouse wheel scrolling in Editor
+			if btn&tcell.WheelUp != 0 {
+				if !app.IsMenuActive() {
+					editor.ScrollLines(-3)
+				}
+				continue
+			}
+			if btn&tcell.WheelDown != 0 {
+				if !app.IsMenuActive() {
+					editor.ScrollLines(3)
+				}
+				continue
+			}
+
+			// 4. Left click or drag
+			if btn&tcell.Button1 != 0 {
+				// 4.1 MenuBar interaction (row 0 or active dropdown)
+				menuBar := app.GetMenuBar()
+				if menuBar.Active || my == 0 {
+					if act, handled := menuBar.HandleMouse(mx, my); handled {
+						if act != "" {
+							dispatchAction(act)
+						}
+						continue
+					}
+				}
+
+				// 4.2 StatusBar interaction (bottom row)
+				statusBar := app.GetStatusBar()
+				if my == screenH-1 {
+					if act, handled := statusBar.HandleMouse(mx, my, screenH, screenW); handled {
+						if act != "" {
+							dispatchAction(act)
+						}
+						continue
+					}
+				}
+
+				// 4.3 Editor viewport interaction
+				intX, intY, intW, intH := app.GetEditorInteriorBounds()
+				isDrag := (tev.Modifiers()&tcell.ModNone != 0 && editor.SelectActive)
+				editor.HandleMouseClick(intX, intY, intW, intH, mx, my, isDrag)
+			}
 		}
 	}
 }
+

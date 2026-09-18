@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"tf77/internal/compiler"
+	"github.com/MaroShim/tf77/internal/compiler"
 )
 
 const (

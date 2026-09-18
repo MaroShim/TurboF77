@@ -11,3 +11,4 @@ bin/
 
 # Go test binaries
 *.test
+dist/

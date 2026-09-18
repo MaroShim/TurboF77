@@ -10,7 +10,7 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/mattn/go-runewidth"
-	"tf77/internal/syntax"
+	"github.com/MaroShim/tf77/internal/syntax"
 )
 
 // Editor holds the state of a code editing buffer
@@ -1469,3 +1469,121 @@ func (e *Editor) PasteText(text string) {
 	}
 	e.Dirty = true
 }
+
+// getLineNumWidth calculates the width of line number gutter if enabled
+func (e *Editor) getLineNumWidth() int {
+	if !e.ShowLineNums {
+		return 0
+	}
+	total := len(e.Lines)
+	digits := 3
+	for total >= 1000 {
+		digits++
+		total /= 10
+	}
+	return digits + 2
+}
+
+// ScrollLines scrolls the editor viewport vertically by delta lines.
+func (e *Editor) ScrollLines(delta int) {
+	newScrollY := e.ScrollY + delta
+	if newScrollY < 0 {
+		newScrollY = 0
+	}
+	maxScrollY := len(e.Lines) - 1
+	if maxScrollY < 0 {
+		maxScrollY = 0
+	}
+	if newScrollY > maxScrollY {
+		newScrollY = maxScrollY
+	}
+	e.ScrollY = newScrollY
+}
+
+// HandleMouseClick translates screen click coordinates into editor buffer line and column.
+// isDrag is true if this event is continuing a selection drag.
+func (e *Editor) HandleMouseClick(interiorX, interiorY, interiorW, interiorH int, clickX, clickY int, isDrag bool) bool {
+	// If outside editor interior boundaries, return false
+	if clickX < interiorX || clickX >= interiorX+interiorW || clickY < interiorY || clickY >= interiorY+interiorH {
+		return false
+	}
+
+	lineOffset := clickY - interiorY
+	targetLine := e.ScrollY + lineOffset
+	if targetLine < 0 {
+		targetLine = 0
+	}
+	if targetLine >= len(e.Lines) {
+		targetLine = len(e.Lines) - 1
+		if targetLine < 0 {
+			targetLine = 0
+		}
+	}
+
+	var lineRunes []rune
+	if targetLine < len(e.Lines) {
+		lineRunes = []rune(e.Lines[targetLine])
+	}
+
+	lineNumWidth := e.getLineNumWidth()
+	codeStartX := interiorX + lineNumWidth
+	targetCol := 0
+
+	tabW := e.TabWidth
+	if tabW <= 0 {
+		tabW = 4
+	}
+
+	if clickX < codeStartX {
+		targetCol = 0
+	} else {
+		currVisualX := codeStartX
+		matched := false
+		for colIdx := e.ScrollX; colIdx < len(lineRunes); colIdx++ {
+			r := lineRunes[colIdx]
+			var charW int
+			if r == '\t' {
+				relCol := currVisualX - codeStartX
+				charW = tabW - (relCol % tabW)
+			} else {
+				charW = runewidth.RuneWidth(r)
+				if charW <= 0 {
+					charW = 1
+				}
+			}
+
+			if clickX >= currVisualX && clickX < currVisualX+charW {
+				targetCol = colIdx
+				matched = true
+				break
+			}
+			currVisualX += charW
+		}
+		if !matched {
+			targetCol = len(lineRunes)
+		}
+	}
+
+	if targetCol < 0 {
+		targetCol = 0
+	}
+	if targetCol > len(lineRunes) {
+		targetCol = len(lineRunes)
+	}
+
+	e.ClearHighlight()
+
+	if !isDrag {
+		e.ClearSelection()
+		e.CursorY = targetLine
+		e.CursorX = targetCol
+		e.StartSelection()
+	} else {
+		e.CursorY = targetLine
+		e.CursorX = targetCol
+		e.UpdateSelection()
+	}
+
+	return true
+}
+

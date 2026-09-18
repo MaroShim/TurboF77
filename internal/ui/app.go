@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/gdamore/tcell/v2"
-	"tf77/internal/compiler"
-	"tf77/internal/debugger"
+	"github.com/MaroShim/tf77/internal/compiler"
+	"github.com/MaroShim/tf77/internal/debugger"
 )
 
 // DialogHolder interfaces
@@ -136,6 +136,27 @@ func (a *App) GetWatchWindow() *WatchWindow {
 
 func (a *App) GetMenuBar() *MenuBar {
 	return a.menuBar
+}
+
+func (a *App) GetStatusBar() *StatusBar {
+	return a.statusBar
+}
+
+// GetEditorInteriorBounds returns the (x, y, w, h) of the editor content area inside its frame.
+func (a *App) GetEditorInteriorBounds() (int, int, int, int) {
+	winX := 0
+	winY := 1
+	winW := a.width
+	totalWorkH := a.height - 2
+	editorH := totalWorkH
+	if a.watchWindow.Visible && totalWorkH >= 12 {
+		watchH := totalWorkH / 3
+		if watchH < 6 {
+			watchH = 6
+		}
+		editorH = totalWorkH - watchH
+	}
+	return winX + 1, winY + 1, winW - 2, editorH - 2
 }
 
 func (a *App) SetStatusMessage(msg string) {

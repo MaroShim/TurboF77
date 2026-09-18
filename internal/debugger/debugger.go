@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"tf77/internal/compiler"
+	"github.com/MaroShim/tf77/internal/compiler"
 )
 
 // Variable represents a variable displayed in Watch window

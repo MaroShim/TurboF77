@@ -122,6 +122,26 @@ Both binaries **auto-switch mode** based on the file extension whenever you open
 * (Optional) `gfortran` (recommended), `flang`, or **Open Watcom 2.0** for compilation
 * (Optional) `lldb` (macOS) or `gdb` (Linux) for native source-level debugging
 
+### Installation via Go (Recommended)
+
+```bash
+# Install Turbo F77 (Classic F77)
+go install github.com/MaroShim/tf77/cmd/tf77@latest
+
+# Install Turbo Fortran (Modern F90+)
+go install github.com/MaroShim/tf77/cmd/tf@latest
+```
+
+Ensure `$GOPATH/bin` (or `~/go/bin`) is in your `$PATH`. You can then launch `tf77` or `tf` from anywhere:
+
+```bash
+tf77
+# or
+tf
+```
+
+### Build from Source
+
 ```bash
 # Build both binaries
 go build -o bin/tf   ./cmd/tf
@@ -294,7 +314,29 @@ If `$WATCOM` is set, Open Watcom takes priority over other compilers. Without it
 
 ---
 
-## 빌드 및 실행
+## 설치 및 빌드 방법
+
+### 1. Go 명령어로 직접 설치 (권장)
+
+소스 코드를 별도로 clone하지 않고 터미널에서 즉시 설치하여 사용할 수 있습니다:
+
+```bash
+# Turbo F77 설치 (클래식 F77 고정 형식 에디터)
+go install github.com/MaroShim/tf77/cmd/tf77@latest
+
+# Turbo Fortran 설치 (현대 F90+ 자유 형식 에디터)
+go install github.com/MaroShim/tf77/cmd/tf@latest
+```
+
+`$GOPATH/bin` (또는 `~/go/bin`)이 `$PATH` 환경 변수에 등록되어 있다면 어디서든 실행할 수 있습니다:
+
+```bash
+tf77
+# 또는
+tf
+```
+
+### 2. 소스 코드에서 직접 빌드 및 실행
 
 ```bash
 # 두 바이너리 모두 빌드

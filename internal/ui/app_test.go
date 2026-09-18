@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/gdamore/tcell/v2"
-	"tf77/internal/debugger"
+	"github.com/MaroShim/tf77/internal/debugger"
 )
 
 func TestAppMultiFileDebugging(t *testing.T) {
