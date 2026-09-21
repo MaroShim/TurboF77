@@ -120,9 +120,9 @@ Both binaries **auto-switch mode** based on the file extension whenever you open
 ### 1. Pre-built Binaries (GitHub Releases)
 
 Download ready-to-use standalone executables (`tf` and `tf77`) for your platform from [GitHub Releases](https://github.com/MaroShim/TurboF77/releases):
-* **macOS**: `tf77-v0.89-darwin-arm64.tar.gz` (Apple Silicon M-series)
-* **Linux**: `tf77-v0.89-linux-amd64.tar.gz` (64-bit)
-* **Windows**: `tf77-v0.89-windows-amd64.zip` (64-bit)
+* **macOS**: `tf77-v0.90-darwin-arm64.tar.gz` (Apple Silicon M-series)
+* **Linux**: `tf77-v0.90-linux-amd64.tar.gz` (64-bit)
+* **Windows**: `tf77-v0.90-windows-amd64.zip` (64-bit)
 
 > [!NOTE]
 > **Windows Defender / SmartScreen Notice**:
@@ -332,9 +332,9 @@ If `$WATCOM` is set, Open Watcom takes priority over other compilers. Without it
 ### 1. 사전 빌드된 바이너리 다운로드 (GitHub Releases)
 
 [GitHub Releases](https://github.com/MaroShim/TurboF77/releases)에서 OS별로 빌드된 독립 실행 파일(`tf`, `tf77` 포함)을 즉시 다운로드하여 사용할 수 있습니다:
-* **macOS (Apple Silicon)**: `tf77-v0.89-darwin-arm64.tar.gz`
-* **Linux (64-bit)**: `tf77-v0.89-linux-amd64.tar.gz`
-* **Windows (64-bit)**: `tf77-v0.89-windows-amd64.zip`
+* **macOS (Apple Silicon)**: `tf77-v0.90-darwin-arm64.tar.gz`
+* **Linux (64-bit)**: `tf77-v0.90-linux-amd64.tar.gz`
+* **Windows (64-bit)**: `tf77-v0.90-windows-amd64.zip`
 
 > [!NOTE]
 > **Windows Defender / SmartScreen 오진 안내**:
