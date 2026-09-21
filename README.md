@@ -107,7 +107,8 @@ Both binaries **auto-switch mode** based on the file extension whenever you open
 | **Alt + L** | **Line Numbers** | Toggle line numbers |
 | **F10** | Menu Bar | Focus top pull-down menu bar |
 | **Alt + X** | Exit | Exit IDE |
-| **Shift + Arrows** | **Select Block** | Select text block |
+| **Ctrl + Left / Right** | **Word Jump** | Move cursor word-by-word (macOS: **Option + Left / Right**) |
+| **Shift + Arrows** | **Select Block** | Select text block (supports Ctrl/Option for word selection) |
 | **Ctrl + C** / **Ctrl + Ins** | **Copy** | Copy selected text to clipboard |
 | **Ctrl + X** / **Shift + Del** | **Cut** | Cut selected text to clipboard |
 | **Ctrl + V** / **Shift + Ins** | **Paste** | Paste clipboard text |
@@ -319,7 +320,8 @@ If `$WATCOM` is set, Open Watcom takes priority over other compilers. Without it
 | **Alt + L** | **Line Numbers** | 라인 번호 표시 on/off |
 | **F10** | Menu Bar | 상단 풀다운 메뉴바 포커스 |
 | **Alt + X** | Exit | IDE 종료 |
-| **Shift + 방향키** | **Select Block** | 텍스트 블록 선택 |
+| **Ctrl + 좌 / 우 방향키** | **단어 단위 이동** | 단어 단위로 커서 좌우 이동 (macOS: **Option + 좌 / 우**) |
+| **Shift + 방향키** | **Select Block** | 텍스트 영역 블록 선택 (Ctrl/Option 조합 시 단어 단위 블록 선택) |
 | **Ctrl + C** / **Ctrl + Ins** | **Copy** | 클립보드로 복사 |
 | **Ctrl + X** / **Shift + Del** | **Cut** | 클립보드로 잘라내기 |
 | **Ctrl + V** / **Shift + Ins** | **Paste** | 커서 위치에 붙여넣기 |
