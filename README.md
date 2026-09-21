@@ -8,6 +8,12 @@ Built with `tcell`, both binaries share the iconic classic Turbo Blue canvas (`#
 
 ---
 
+<p align="center">
+  <img src="docs/images/screenshot.png" alt="Turbo Fortran Screenshot" width="850">
+</p>
+
+---
+
 ## Two Binaries, One Codebase
 
 | Binary | Identity | Default File | Default Mode | Column Guides |
@@ -222,6 +228,12 @@ If `$WATCOM` is set, Open Watcom takes priority over other compilers. Without it
 > **현대 및 클래식 포트란을 위한 볼랜드 터보 비전 레트로 TUI IDE**
 
 **Turbo Fortran**은 두 개의 독립 Go 바이너리를 제공합니다 — `tf` (모던 포트란 / 자유 형식, F90+)와 `tf77` (클래식 FORTRAN 77 / 고정 형식). 90년대 볼랜드(Borland)의 전설적인 **Turbo Pascal**과 **Turbo C** 특유의 터보 비전 UI(파란색 에디터 캔버스 `#0000A8`, 이중선 프레임 `╔═╗`, 풀다운 메뉴바, `Alt+F5` User Screen, 사운드 FX)에 **gfortran** 기반 컴파일러 및 `lldb`/`gdb` 네이티브 디버거를 결합한 레트로 터미널 개발 환경(TUI IDE)입니다.
+
+---
+
+<p align="center">
+  <img src="docs/images/screenshot.png" alt="Turbo Fortran 스크린샷" width="850">
+</p>
 
 ---
 
