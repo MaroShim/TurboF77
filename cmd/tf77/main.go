@@ -622,14 +622,6 @@ func main() {
 					// Alt+F3: Find in Project
 					dispatchAction("search_project")
 					continue
-				} else if key == tcell.KeyLeft {
-					// Alt+Left: Previous Location
-					dispatchAction("search_prev_pos")
-					continue
-				} else if key == tcell.KeyRight {
-					// Alt+Right: Next Location
-					dispatchAction("search_next_pos")
-					continue
 				} else if key == tcell.KeyBackspace || key == tcell.KeyBackspace2 {
 					// Alt+Backspace: Undo (Classic Turbo Vision convention)
 					dispatchAction("edit_undo")
@@ -761,10 +753,8 @@ func main() {
 						app.OpenMenuAt(idx)
 						continue
 					}
-					// Hotkey for items within current dropdown (e.g. N for New, O for Open, X for Exit)
-					act := app.MenuTriggerHotKey(ch)
-					if act != "" {
-						app.MenuClose()
+					// Hotkey for items within current dropdown (using MenuHandleKey)
+					if act, ok := app.MenuHandleKey(ch); ok && act != "" {
 						dispatchAction(act)
 						continue
 					}
@@ -786,21 +776,36 @@ func main() {
 					}
 				case tcell.KeyEscape:
 					app.MenuClose()
+				case tcell.KeyRune:
+					if ch != 0 {
+						if act, ok := app.MenuHandleKey(ch); ok && act != "" {
+							dispatchAction(act)
+						}
+					}
 				}
 				continue
 			}
 
 			// 5. Editor Navigation & Typing
 			// Shift + Arrow block selection
+			isWordNav := (mod&(tcell.ModCtrl|tcell.ModAlt) != 0)
 			if mod&tcell.ModShift != 0 {
 				switch key {
 				case tcell.KeyLeft:
 					editor.StartSelection()
-					editor.MoveLeft()
+					if isWordNav {
+						editor.MoveWordLeft()
+					} else {
+						editor.MoveLeft()
+					}
 					editor.UpdateSelection()
 				case tcell.KeyRight:
 					editor.StartSelection()
-					editor.MoveRight()
+					if isWordNav {
+						editor.MoveWordRight()
+					} else {
+						editor.MoveRight()
+					}
 					editor.UpdateSelection()
 				case tcell.KeyUp:
 					editor.StartSelection()
@@ -821,12 +826,20 @@ func main() {
 				if editor.SelectActive {
 					editor.ClearSelection()
 				}
-				editor.MoveLeft()
+				if isWordNav {
+					editor.MoveWordLeft()
+				} else {
+					editor.MoveLeft()
+				}
 			case tcell.KeyRight:
 				if editor.SelectActive {
 					editor.ClearSelection()
 				}
-				editor.MoveRight()
+				if isWordNav {
+					editor.MoveWordRight()
+				} else {
+					editor.MoveRight()
+				}
 			case tcell.KeyUp:
 				if editor.SelectActive {
 					editor.ClearSelection()

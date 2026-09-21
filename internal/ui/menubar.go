@@ -13,6 +13,8 @@ type MenuItem struct {
 	ActionID string
 	Disabled bool
 	IsSep    bool
+	HotKey   rune // Hotkey character (e.g. 'N', 'O', 'S', 'A')
+	HotIndex int  // Index of the hotkey in Label (-1 if none)
 }
 
 // Menu represents a top-level menu column (e.g. "File", "Compile")
@@ -40,12 +42,12 @@ func NewMenuBar() *MenuBar {
 				HotKey:   'F',
 				HotIndex: 0,
 				Items: []MenuItem{
-					{Label: "New", ActionID: "file_new"},
-					{Label: "Open...", Shortcut: "F3", ActionID: "file_open"},
-					{Label: "Save", Shortcut: "F2", ActionID: "file_save"},
-					{Label: "Save as...", ActionID: "file_save_as"},
+					{Label: "New", HotKey: 'N', HotIndex: 0, ActionID: "file_new"},
+					{Label: "Open...", Shortcut: "F3", HotKey: 'O', HotIndex: 0, ActionID: "file_open"},
+					{Label: "Save", Shortcut: "F2", HotKey: 'S', HotIndex: 0, ActionID: "file_save"},
+					{Label: "Save as...", HotKey: 'A', HotIndex: 5, ActionID: "file_save_as"},
 					{IsSep: true},
-					{Label: "Exit", Shortcut: "Alt+X", ActionID: "app_exit"},
+					{Label: "Exit", Shortcut: "Alt+X", HotKey: 'X', HotIndex: 1, ActionID: "app_exit"},
 				},
 			},
 			{
@@ -53,15 +55,15 @@ func NewMenuBar() *MenuBar {
 				HotKey:   'E',
 				HotIndex: 0,
 				Items: []MenuItem{
-					{Label: "Undo", Shortcut: "Ctrl+Z", ActionID: "edit_undo"},
-					{Label: "Redo", Shortcut: "Ctrl+Y", ActionID: "edit_redo"},
+					{Label: "Undo", Shortcut: "Ctrl+Z", HotKey: 'U', HotIndex: 0, ActionID: "edit_undo"},
+					{Label: "Redo", Shortcut: "Ctrl+Y", HotKey: 'R', HotIndex: 0, ActionID: "edit_redo"},
 					{IsSep: true},
-					{Label: "Cut", Shortcut: "Ctrl+X", ActionID: "edit_cut"},
-					{Label: "Copy", Shortcut: "Ctrl+C", ActionID: "edit_copy"},
-					{Label: "Paste", Shortcut: "Ctrl+V", ActionID: "edit_paste"},
-					{Label: "Clear", Shortcut: "Ctrl+Del", ActionID: "edit_clear"},
+					{Label: "Cut", Shortcut: "Ctrl+X", HotKey: 'T', HotIndex: 2, ActionID: "edit_cut"},
+					{Label: "Copy", Shortcut: "Ctrl+C", HotKey: 'C', HotIndex: 0, ActionID: "edit_copy"},
+					{Label: "Paste", Shortcut: "Ctrl+V", HotKey: 'P', HotIndex: 0, ActionID: "edit_paste"},
+					{Label: "Clear", Shortcut: "Ctrl+Del", HotKey: 'L', HotIndex: 1, ActionID: "edit_clear"},
 					{IsSep: true},
-					{Label: "Select All", Shortcut: "Ctrl+A", ActionID: "edit_select_all"},
+					{Label: "Select All", Shortcut: "Ctrl+A", HotKey: 'A', HotIndex: 7, ActionID: "edit_select_all"},
 				},
 			},
 			{
@@ -69,14 +71,14 @@ func NewMenuBar() *MenuBar {
 				HotKey:   'S',
 				HotIndex: 0,
 				Items: []MenuItem{
-					{Label: "Find...", Shortcut: "Ctrl+F", ActionID: "search_find"},
-					{Label: "Find in project...", Shortcut: "Alt+F3", ActionID: "search_project"},
-					{Label: "Go to definition", Shortcut: "F12", ActionID: "search_definition"},
-					{Label: "Previous location", Shortcut: "Ctrl+-", ActionID: "search_prev_pos"},
-					{Label: "Next location", Shortcut: "Ctrl+Shift+-", ActionID: "search_next_pos"},
+					{Label: "Find...", Shortcut: "Ctrl+F", HotKey: 'F', HotIndex: 0, ActionID: "search_find"},
+					{Label: "Find in project...", Shortcut: "Alt+F3", HotKey: 'P', HotIndex: 8, ActionID: "search_project"},
+					{Label: "Go to definition", Shortcut: "F12", HotKey: 'D', HotIndex: 6, ActionID: "search_definition"},
+					{Label: "Previous location", Shortcut: "Ctrl+-", HotKey: 'U', HotIndex: 6, ActionID: "search_prev_pos"},
+					{Label: "Next location", Shortcut: "Ctrl+Shift+-", HotKey: 'N', HotIndex: 0, ActionID: "search_next_pos"},
 					{IsSep: true},
-					{Label: "Search again", Shortcut: "Ctrl+L", ActionID: "search_again"},
-					{Label: "Go to line...", Shortcut: "Alt+G", ActionID: "search_goto"},
+					{Label: "Search again", Shortcut: "Ctrl+L", HotKey: 'A', HotIndex: 7, ActionID: "search_again"},
+					{Label: "Go to line...", Shortcut: "Alt+G", HotKey: 'G', HotIndex: 0, ActionID: "search_goto"},
 				},
 			},
 			{
@@ -84,9 +86,9 @@ func NewMenuBar() *MenuBar {
 				HotKey:   'R',
 				HotIndex: 0,
 				Items: []MenuItem{
-					{Label: "Run", Shortcut: "Ctrl+F9", ActionID: "run_run"},
-					{Label: "Program reset", Shortcut: "Ctrl+F2", ActionID: "run_reset"},
-					{Label: "User screen", Shortcut: "Alt+F5", ActionID: "run_userscreen"},
+					{Label: "Run", Shortcut: "Ctrl+F9", HotKey: 'R', HotIndex: 0, ActionID: "run_run"},
+					{Label: "Program reset", Shortcut: "Ctrl+F2", HotKey: 'P', HotIndex: 0, ActionID: "run_reset"},
+					{Label: "User screen", Shortcut: "Alt+F5", HotKey: 'U', HotIndex: 0, ActionID: "run_userscreen"},
 				},
 			},
 			{
@@ -94,9 +96,9 @@ func NewMenuBar() *MenuBar {
 				HotKey:   'C',
 				HotIndex: 0,
 				Items: []MenuItem{
-					{Label: "Compile", Shortcut: "Alt+F9", ActionID: "compile_compile"},
-					{Label: "Make", Shortcut: "F9", ActionID: "compile_make"},
-					{Label: "Build all", ActionID: "compile_buildall"},
+					{Label: "Compile", Shortcut: "Alt+F9", HotKey: 'C', HotIndex: 0, ActionID: "compile_compile"},
+					{Label: "Make", Shortcut: "F9", HotKey: 'M', HotIndex: 0, ActionID: "compile_make"},
+					{Label: "Build all", HotKey: 'B', HotIndex: 0, ActionID: "compile_buildall"},
 				},
 			},
 			{
@@ -104,14 +106,14 @@ func NewMenuBar() *MenuBar {
 				HotKey:   'D',
 				HotIndex: 0,
 				Items: []MenuItem{
-					{Label: "Start / Continue", Shortcut: "F5", ActionID: "debug_continue"},
-					{Label: "Step Over", Shortcut: "F8", ActionID: "debug_step_over"},
-					{Label: "Trace Into", Shortcut: "F7", ActionID: "debug_step_into"},
-					{Label: "Toggle Breakpoint", Shortcut: "F4", ActionID: "debug_toggle_bp"},
-					{Label: "Stop Debugger", Shortcut: "Ctrl+F2", ActionID: "debug_stop"},
-					{Label: "Watches Window", ActionID: "debug_watches"},
+					{Label: "Start / Continue", Shortcut: "F5", HotKey: 'S', HotIndex: 0, ActionID: "debug_continue"},
+					{Label: "Step Over", Shortcut: "F8", HotKey: 'O', HotIndex: 5, ActionID: "debug_step_over"},
+					{Label: "Trace Into", Shortcut: "F7", HotKey: 'T', HotIndex: 0, ActionID: "debug_step_into"},
+					{Label: "Toggle Breakpoint", Shortcut: "F4", HotKey: 'B', HotIndex: 7, ActionID: "debug_toggle_bp"},
+					{Label: "Stop Debugger", Shortcut: "Ctrl+F2", HotKey: 'P', HotIndex: 3, ActionID: "debug_stop"},
+					{Label: "Watches Window", HotKey: 'W', HotIndex: 0, ActionID: "debug_watches"},
 					{IsSep: true},
-					{Label: "Engine: Internal (F77)", ActionID: "debug_toggle_engine"},
+					{Label: "Engine: Internal (F77)", HotKey: 'E', HotIndex: 0, ActionID: "debug_toggle_engine"},
 				},
 			},
 			{
@@ -119,10 +121,10 @@ func NewMenuBar() *MenuBar {
 				HotKey:   'O',
 				HotIndex: 0,
 				Items: []MenuItem{
-					{Label: "Line Numbers", Shortcut: "Alt+L", ActionID: "options_toggle_linenums"},
-					{Label: "Column Guides: ON", ActionID: "options_toggle_guides"},
-					{Label: "Sound: ON", ActionID: "options_toggle_sound"},
-					{Label: "Compiler Info", ActionID: "options_compiler_info"},
+					{Label: "Line Numbers", Shortcut: "Alt+L", HotKey: 'L', HotIndex: 0, ActionID: "options_toggle_linenums"},
+					{Label: "Column Guides: ON", HotKey: 'G', HotIndex: 7, ActionID: "options_toggle_guides"},
+					{Label: "Sound: ON", HotKey: 'S', HotIndex: 0, ActionID: "options_toggle_sound"},
+					{Label: "Compiler Info", HotKey: 'C', HotIndex: 0, ActionID: "options_compiler_info"},
 				},
 			},
 			{
@@ -130,9 +132,9 @@ func NewMenuBar() *MenuBar {
 				HotKey:   'W',
 				HotIndex: 0,
 				Items: []MenuItem{
-					{Label: "Tile", ActionID: "window_tile"},
-					{Label: "Cascade", ActionID: "window_cascade"},
-					{Label: "Close", Shortcut: "Alt+F3", ActionID: "window_close"},
+					{Label: "Tile", HotKey: 'T', HotIndex: 0, ActionID: "window_tile"},
+					{Label: "Cascade", HotKey: 'C', HotIndex: 0, ActionID: "window_cascade"},
+					{Label: "Close", Shortcut: "Alt+F3", HotKey: 'O', HotIndex: 2, ActionID: "window_close"},
 				},
 			},
 			{
@@ -140,8 +142,8 @@ func NewMenuBar() *MenuBar {
 				HotKey:   'H',
 				HotIndex: 0,
 				Items: []MenuItem{
-					{Label: "Fortran 77 Help", Shortcut: "F1", ActionID: "help_f77"},
-					{Label: "About Turbo F77...", ActionID: "help_about"},
+					{Label: "Fortran 77 Help", Shortcut: "F1", HotKey: 'F', HotIndex: 0, ActionID: "help_f77"},
+					{Label: "About Turbo F77...", HotKey: 'A', HotIndex: 0, ActionID: "help_about"},
 				},
 			},
 		},
@@ -240,6 +242,26 @@ func (m *MenuBar) GetSelectedAction() string {
 		}
 	}
 	return ""
+}
+
+// HandleKey checks if the pressed rune matches any hotkey in the active dropdown menu (case-insensitive).
+// If matched and enabled, it closes the dropdown and returns the corresponding action ID.
+func (m *MenuBar) HandleKey(ch rune) (string, bool) {
+	if !m.Active || !m.OpenDropdown {
+		return "", false
+	}
+	menu := m.Menus[m.ActiveMenu]
+	target := unicode.ToUpper(ch)
+	for _, item := range menu.Items {
+		if item.IsSep || item.Disabled || item.ActionID == "" {
+			continue
+		}
+		if item.HotKey != 0 && unicode.ToUpper(item.HotKey) == target {
+			m.Close()
+			return item.ActionID, true
+		}
+	}
+	return "", false
 }
 
 // Draw renders the top menubar and active dropdown
@@ -376,11 +398,11 @@ func (m *MenuBar) drawDropdown(screen tcell.Screen, startX int) {
 			screen.SetContent(c, row, ' ', nil, itemStyle)
 		}
 
-		// Label with hotkey (first char)
+		// Label with hotkey
 		labelRunes := []rune(item.Label)
 		lx := startX + 2
 		for j, r := range labelRunes {
-			if !isItemActive && j == 0 && item.ActionID != "" {
+			if !isItemActive && item.ActionID != "" && item.HotIndex >= 0 && j == item.HotIndex {
 				screen.SetContent(lx+j, row, r, nil, itemStyle.Foreground(ColorDropdownHotKey).Bold(true))
 			} else {
 				screen.SetContent(lx+j, row, r, nil, itemStyle)

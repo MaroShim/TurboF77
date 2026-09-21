@@ -205,6 +205,10 @@ func (a *App) MenuSelect() string {
 	return act
 }
 
+func (a *App) MenuHandleKey(ch rune) (string, bool) {
+	return a.menuBar.HandleKey(ch)
+}
+
 func (a *App) MenuTriggerHotKey(r rune) string {
 	return a.menuBar.TriggerItemByHotKey(r)
 }
