@@ -39,7 +39,6 @@ Both binaries **auto-switch mode** based on the file extension whenever you open
 
 * **Alt + Hotkey Direct Menu Navigation**:
   * Open any top menu instantly with `Alt+F` (File), `Alt+E` (Edit), `Alt+S` (Search), `Alt+R` (Run), `Alt+C` (Compile), `Alt+D` (Debug), `Alt+O` (Options), `Alt+W` (Window), `Alt+H` (Help)
-  * macOS Option key translation support (`Option+F = ƒ`, `Option+E = ´`, etc.) and `Esc` prefix navigation
 
 * **Dual-Mode Syntax Highlighting**:
   * **F77 Fixed-Form**: Column-aware tokenizer (label, continuation, statement, inline comment). Keywords: `PROGRAM`, `SUBROUTINE`, `FUNCTION`, `DO`, `GOTO`, `COMMON`, `EQUIVALENCE`, etc.

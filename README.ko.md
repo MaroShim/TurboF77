@@ -36,7 +36,6 @@
 
 * **Alt + 첫 글자 메뉴 즉시 호출**:
   * `Alt+F`(File), `Alt+E`(Edit), `Alt+S`(Search), `Alt+R`(Run), `Alt+C`(Compile), `Alt+D`(Debug), `Alt+O`(Options), `Alt+W`(Window), `Alt+H`(Help)
-  * macOS Option 키 유니코드 매핑(`Option+F = ƒ`, `Option+E = ´` 등) 및 `Esc` 프리픽스 완벽 지원
 
 * **이중 모드 구문 강조(Dual-Mode Syntax Highlighting)**:
   * **F77 고정 형식**: 열 기반 토크나이저 (레이블, 연속행, 문장, 인라인 주석 각각 별도 강조)
