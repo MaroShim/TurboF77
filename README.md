@@ -129,9 +129,9 @@ Both binaries **auto-switch mode** based on the file extension whenever you open
 ### 1. Pre-built Binaries (GitHub Releases)
 
 Download ready-to-use standalone executables (`tf` and `tf77`) for your platform from [GitHub Releases](https://github.com/MaroShim/TurboF77/releases):
-* **macOS**: `tf77-v0.90-darwin-arm64.tar.gz` (Apple Silicon M-series)
-* **Linux**: `tf77-v0.90-linux-amd64.tar.gz` (64-bit)
-* **Windows**: `tf77-v0.90-windows-amd64.zip` (64-bit)
+* **macOS**: `tf77-v0.90.1-darwin-arm64.tar.gz` (Apple Silicon M-series)
+* **Linux**: `tf77-v0.90.1-linux-amd64.tar.gz` (64-bit)
+* **Windows**: `tf77-v0.90.1-windows-amd64.zip` (64-bit)
 
 > [!NOTE]
 > **Windows Defender / SmartScreen Notice**:
