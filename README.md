@@ -121,6 +121,12 @@ Both binaries **auto-switch mode** based on the file extension whenever you open
 | **Ctrl + V** / **Shift + Ins** | **Paste** | Paste clipboard text |
 | **Esc** | Close / Cancel | Dismiss modal dialog / clear selection |
 
+> [!TIP]
+> **macOS Terminal Option (Alt) Key Configuration**:
+> On macOS, to ensure `Alt` key shortcuts (`Alt+F`, `Alt+X`, `Alt+F9`, `Alt+F5`, etc.) function properly, configure your terminal to **use the Option key as a Meta key**:
+> - **macOS Terminal.app**: `Settings` ➔ `Profiles` ➔ `Keyboard` ➔ Check **"Use Option as Meta key"**
+> - **iTerm2**: `Settings` ➔ `Profiles` ➔ `Keys` ➔ Set `Left/Right Option Key` to **"Esc+"**
+
 ---
 
 ## Build and Installation
