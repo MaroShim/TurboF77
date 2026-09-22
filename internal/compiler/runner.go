@@ -267,7 +267,8 @@ func FindCompanionFiles(targetPath string) []string {
 	baseTarget := filepath.Base(absTarget)
 
 	// Avoid scanning companions if the file is an unsaved temporary buffer in temp directory
-	if strings.HasPrefix(baseTarget, "tf77_temp_") {
+	if strings.HasPrefix(baseTarget, "tf77_temp_") || strings.HasPrefix(baseTarget, "tf_temp_") ||
+		strings.HasPrefix(baseTarget, "tf77_dbg_") || strings.HasPrefix(baseTarget, "tf_dbg_") {
 		return nil
 	}
 

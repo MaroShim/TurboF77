@@ -299,9 +299,14 @@ func (e *Editor) LoadFile(path string) error {
 }
 
 func (e *Editor) SaveFile() error {
-	if e.FilePath == "" || e.FilePath == "NONAME00.FOR" {
-		e.FilePath = "main.for"
-		e.FileName = "main.for"
+	if e.FilePath == "" || e.FilePath == "NONAME00.FOR" || e.FilePath == "NONAME00.F90" {
+		if e.IsFreeForm {
+			e.FilePath = "main.f90"
+			e.FileName = "main.f90"
+		} else {
+			e.FilePath = "main.for"
+			e.FileName = "main.for"
+		}
 	}
 	cleanedPath := filepath.Clean(e.FilePath)
 	e.FilePath = cleanedPath

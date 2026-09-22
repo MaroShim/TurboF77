@@ -611,5 +611,49 @@ func TestEditor_WordMovement(t *testing.T) {
 	}
 }
 
+func TestEditorFreeFormDefaultFileNameAndSave(t *testing.T) {
+	tempDir := t.TempDir()
 
+	// 1. Free-form editor default properties
+	edFree := NewEditorFreeForm("", 1)
+	if edFree.FileName != "NONAME00.F90" {
+		t.Errorf("expected default free-form filename NONAME00.F90, got %s", edFree.FileName)
+	}
+	if !edFree.IsFreeForm {
+		t.Errorf("expected IsFreeForm=true for free-form editor")
+	}
 
+	// Change working dir to tempDir for save testing
+	origWd, _ := os.Getwd()
+	_ = os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(origWd) }()
+
+	if err := edFree.SaveFile(); err != nil {
+		t.Fatalf("SaveFile failed: %v", err)
+	}
+	if edFree.FileName != "main.f90" {
+		t.Errorf("expected saved filename to be main.f90, got %s", edFree.FileName)
+	}
+	if !strings.HasSuffix(edFree.FilePath, "main.f90") {
+		t.Errorf("expected saved filepath to end with main.f90, got %s", edFree.FilePath)
+	}
+
+	// 2. Fixed-form editor default properties
+	edFixed := NewEditor("", 1)
+	if edFixed.FileName != "NONAME00.FOR" {
+		t.Errorf("expected default fixed-form filename NONAME00.FOR, got %s", edFixed.FileName)
+	}
+	if edFixed.IsFreeForm {
+		t.Errorf("expected IsFreeForm=false for fixed-form editor")
+	}
+
+	if err := edFixed.SaveFile(); err != nil {
+		t.Fatalf("SaveFile failed: %v", err)
+	}
+	if edFixed.FileName != "main.for" {
+		t.Errorf("expected saved filename to be main.for, got %s", edFixed.FileName)
+	}
+	if !strings.HasSuffix(edFixed.FilePath, "main.for") {
+		t.Errorf("expected saved filepath to end with main.for, got %s", edFixed.FilePath)
+	}
+}

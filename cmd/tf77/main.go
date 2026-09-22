@@ -77,8 +77,12 @@ func main() {
 	var dispatchAction func(actionID string)
 
 	performFileSave := func(onSuccess func()) {
-		if editor.FilePath == "" || editor.FilePath == "NONAME00.FOR" {
-			saveDlg.Show("main.for", func(path string) {
+		if editor.FilePath == "" || editor.FilePath == "NONAME00.FOR" || editor.FilePath == "NONAME00.F90" {
+			defaultName := "main.for"
+			if editor.IsFreeForm {
+				defaultName = "main.f90"
+			}
+			saveDlg.Show(defaultName, func(path string) {
 				if err := editor.SaveAs(path); err != nil {
 					sound.PlayError()
 					app.SetStatusMessage("Error saving " + filepath.Base(path) + ": " + err.Error())
@@ -142,8 +146,12 @@ func main() {
 			performFileSave(nil)
 		case "file_save_as":
 			defaultName := editor.FileName
-			if defaultName == "" || defaultName == "NONAME00.FOR" {
-				defaultName = "main.for"
+			if defaultName == "" || defaultName == "NONAME00.FOR" || defaultName == "NONAME00.F90" {
+				if editor.IsFreeForm {
+					defaultName = "main.f90"
+				} else {
+					defaultName = "main.for"
+				}
 			}
 			saveDlg.Show(defaultName, func(path string) {
 				if err := editor.SaveAs(path); err != nil {

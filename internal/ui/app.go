@@ -332,8 +332,12 @@ func (a *App) SyncDebuggerState() {
 func (a *App) StartDebugging() error {
 	targetFile := a.editor.FilePath
 	if targetFile == "" || a.editor.Dirty {
-		if targetFile == "" || targetFile == "NONAME00.FOR" {
-			targetFile = filepath.Join(os.TempDir(), "tf77_dbg_main.for")
+		if targetFile == "" || targetFile == "NONAME00.FOR" || targetFile == "NONAME00.F90" {
+			if a.editor.IsFreeForm {
+				targetFile = filepath.Join(os.TempDir(), "tf_dbg_main.f90")
+			} else {
+				targetFile = filepath.Join(os.TempDir(), "tf77_dbg_main.for")
+			}
 			_ = a.editor.SaveAs(targetFile)
 		} else {
 			_ = a.editor.SaveFile()
@@ -576,8 +580,12 @@ func (a *App) HasModalVisible() bool {
 func (a *App) CompileCurrent() *compiler.BuildResult {
 	targetFile := a.editor.FilePath
 	if targetFile == "" || a.editor.Dirty {
-		if targetFile == "" || targetFile == "NONAME00.FOR" {
-			targetFile = filepath.Join(os.TempDir(), "tf77_temp_main.for")
+		if targetFile == "" || targetFile == "NONAME00.FOR" || targetFile == "NONAME00.F90" {
+			if a.editor.IsFreeForm {
+				targetFile = filepath.Join(os.TempDir(), "tf_temp_main.f90")
+			} else {
+				targetFile = filepath.Join(os.TempDir(), "tf77_temp_main.for")
+			}
 			_ = a.editor.SaveAs(targetFile)
 		} else {
 			_ = a.editor.SaveFile()
